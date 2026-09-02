@@ -1,0 +1,4 @@
+# PyPI gunicorn 23.0.0 universal wheel, MIT license.
+# Verified 2026-08-30 against PyPI JSON metadata.
+gunicorn==23.0.0 \
+    --hash=sha256:ec400d38950de4dfd418cff8328b2c8faed0edb0d517d3394e457c317908ca4d

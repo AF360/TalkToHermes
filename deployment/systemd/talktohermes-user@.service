@@ -1,0 +1,31 @@
+[Unit]
+Description=TalkToHermes bridge for %i (user service)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60s
+StartLimitBurst=3
+
+[Service]
+Type=simple
+WorkingDirectory=%h/.local/opt/talktohermes/current/backend
+ExecStart=%h/.local/opt/talktohermes/current/backend/.venv/bin/talktohermes-production %h/.config/talktohermes/%i.yaml
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=30s
+TimeoutStopSec=20s
+KillSignal=SIGTERM
+KillMode=mixed
+UMask=0077
+
+# Mount-namespace directives are intentionally absent. In an unprivileged user
+# manager they map reviewed root-owned adapter paths to nobody, causing the
+# bridge's ownership gate to reject them. The service still runs without root.
+NoNewPrivileges=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=default.target

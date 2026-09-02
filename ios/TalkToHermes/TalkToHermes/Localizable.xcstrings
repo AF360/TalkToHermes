@@ -1,0 +1,1092 @@
+{
+  "sourceLanguage" : "de",
+  "strings" : {
+    "%@ benötigt deine Freigabe" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ needs your approval"
+          }
+        }
+      }
+    },
+    "%@ denkt nach …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is thinking …"
+          }
+        }
+      }
+    },
+    "%@ möchte eine Aktion ausführen. Die Freigabe gilt nur für diesen Vorgang." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ wants to perform an action. Approval applies only to this operation."
+          }
+        }
+      }
+    },
+    "%@ spricht" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is speaking"
+          }
+        }
+      }
+    },
+    "%@ verarbeitet die Anfrage …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is processing the request …"
+          }
+        }
+      }
+    },
+    "Abbruch noch nicht bestätigt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancellation not yet confirmed"
+          }
+        }
+      }
+    },
+    "Abbruch wird bestätigt …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirming cancellation …"
+          }
+        }
+      }
+    },
+    "Abgebrochen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancelled"
+          }
+        }
+      }
+    },
+    "Ablehnen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deny"
+          }
+        }
+      }
+    },
+    "Ablehnung wird übermittelt …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending denial …"
+          }
+        }
+      }
+    },
+    "Antwort bereit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response ready"
+          }
+        }
+      }
+    },
+    "Antwort bereit (Fallback-Stimme)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response ready (fallback voice)"
+          }
+        }
+      }
+    },
+    "Antwort erneut abspielen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replay response"
+          }
+        }
+      }
+    },
+    "Antwort teilen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Share response"
+          }
+        }
+      }
+    },
+    "Antwort von %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response from %@"
+          }
+        }
+      }
+    },
+    "Antwort wird gesprochen …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaking response …"
+          }
+        }
+      }
+    },
+    "Antwortlänge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response length"
+          }
+        }
+      }
+    },
+    "App" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App"
+          }
+        }
+      }
+    },
+    "App-Token" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App token"
+          }
+        }
+      }
+    },
+    "Audio wird nur für den aktuellen Sprachturn übertragen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio is transferred only for the current voice turn."
+          }
+        }
+      }
+    },
+    "Audio wird übertragen …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uploading audio …"
+          }
+        }
+      }
+    },
+    "Aufnahme läuft – zum Beenden erneut tippen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording – tap again to finish"
+          }
+        }
+      }
+    },
+    "Aufnahmedauer %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording duration %@"
+          }
+        }
+      }
+    },
+    "Ausführlich" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detailed"
+          }
+        }
+      }
+    },
+    "Ausführliche gesprochene Erklärung" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detailed spoken explanation"
+          }
+        }
+      }
+    },
+    "Authentifizierung" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication"
+          }
+        }
+      }
+    },
+    "Beendet die Aufnahme und sendet sie an %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops the recording and sends it to %@."
+          }
+        }
+      }
+    },
+    "Beim Sichern wird die Bridge authentifiziert geprüft. Erst danach übernimmt die App die neuen Werte." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When you save, the bridge is checked with authentication. The app applies the new values only after that."
+          }
+        }
+      }
+    },
+    "Bereit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready"
+          }
+        }
+      }
+    },
+    "Bridge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bridge"
+          }
+        }
+      }
+    },
+    "bridge.example.com" : {
+
+    },
+    "Datenschutz" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy"
+          }
+        }
+      }
+    },
+    "Deine Entscheidung" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Your decision"
+          }
+        }
+      }
+    },
+    "Der App-Token darf nicht leer sein." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app token must not be empty."
+          }
+        }
+      }
+    },
+    "Der App-Token konnte im Schlüsselbund nicht verarbeitet werden." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app token could not be processed in the keychain."
+          }
+        }
+      }
+    },
+    "Der gespeicherte App-Token konnte nicht gelesen werden." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The saved app token could not be read."
+          }
+        }
+      }
+    },
+    "Der Mikrofonzugriff wurde nicht erlaubt." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Microphone access was not allowed."
+          }
+        }
+      }
+    },
+    "Der Port muss zwischen 1 und 65535 liegen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The port must be between 1 and 65535."
+          }
+        }
+      }
+    },
+    "Der Servername ist ungültig." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The server name is invalid."
+          }
+        }
+      }
+    },
+    "Der Token wird beim Laden nie im Klartext angezeigt." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The token is never shown in plain text when loaded."
+          }
+        }
+      }
+    },
+    "Der Turn konnte nicht sauber abgebrochen werden. Du kannst den Abbruch erneut versuchen: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The turn could not be cancelled cleanly. You can try cancelling again: %@"
+          }
+        }
+      }
+    },
+    "Deutsch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "German"
+          }
+        }
+      }
+    },
+    "Die Anfrage-ID ist ungültig." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The request ID is invalid."
+          }
+        }
+      }
+    },
+    "Die App verwendet keine HTTP-Verbindung und keinen Web-Cache." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app does not use an HTTP connection or web cache."
+          }
+        }
+      }
+    },
+    "Die Audioantwort ist zu groß zum Abspielen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The audio response is too large to play."
+          }
+        }
+      }
+    },
+    "Die Aufnahme ist zu groß zum Übertragen." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The recording is too large to upload."
+          }
+        }
+      }
+    },
+    "Die Auswahl gilt ab dem nächsten Sprachturn." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The selection applies from the next voice turn."
+          }
+        }
+      }
+    },
+    "Die Bridge hat ein unerwartetes Audioformat geliefert." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The bridge returned an unexpected audio format."
+          }
+        }
+      }
+    },
+    "Die Bridge hat eine ungültige Antwort geliefert." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The bridge returned an invalid response."
+          }
+        }
+      }
+    },
+    "Die Bridge hat mit HTTP-Status %lld geantwortet." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The bridge responded with HTTP status %lld."
+          }
+        }
+      }
+    },
+    "Die Einstellungen oder der Verbindungstest sind fehlgeschlagen: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The settings or connection test failed: %@"
+          }
+        }
+      }
+    },
+    "Die sichere Verbindung zur Bridge konnte nicht geprüft werden: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The secure connection to the bridge could not be verified: %@"
+          }
+        }
+      }
+    },
+    "Die Sprachaufnahme ist derzeit nicht verfügbar." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voice recording is currently unavailable."
+          }
+        }
+      }
+    },
+    "Die vorherige Unterhaltung konnte nicht gelöscht werden: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The previous conversation could not be deleted: %@"
+          }
+        }
+      }
+    },
+    "Diese Antwort verwendet die lokale Fallback-Stimme." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This response uses the local fallback voice."
+          }
+        }
+      }
+    },
+    "Direkt, meist ein bis drei Sätze" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direct, usually one to three sentences"
+          }
+        }
+      }
+    },
+    "Einen Moment …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One moment …"
+          }
+        }
+      }
+    },
+    "Einmal erlauben" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow once"
+          }
+        }
+      }
+    },
+    "Einstellungen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
+    "Einstellungen konnten nicht gespeichert werden" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings could not be saved"
+          }
+        }
+      }
+    },
+    "Englisch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English"
+          }
+        }
+      }
+    },
+    "Erneut abspielen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replay"
+          }
+        }
+      }
+    },
+    "Es ist kein App-Token im Schlüsselbund gespeichert." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No app token is saved in the keychain."
+          }
+        }
+      }
+    },
+    "Fehler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error"
+          }
+        }
+      }
+    },
+    "Freigabe erforderlich" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval required"
+          }
+        }
+      }
+    },
+    "Freigabe wird übermittelt …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sending approval …"
+          }
+        }
+      }
+    },
+    "Für einen neuen oder geänderten Server muss der zugehörige Token erneut eingegeben werden." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "For a new or changed server, its token must be entered again."
+          }
+        }
+      }
+    },
+    "Gespräch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation"
+          }
+        }
+      }
+    },
+    "Gesprochene Sprache" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spoken language"
+          }
+        }
+      }
+    },
+    "Host" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Host"
+          }
+        }
+      }
+    },
+    "Ich höre zu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I'm listening"
+          }
+        }
+      }
+    },
+    "Knopf nicht gedrückt halten: einmal zum Starten tippen, einmal zum Senden. %@ antwortet anschließend automatisch per Sprache." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There is no need to hold a button: tap once to start and once to send. %@ then responds automatically with speech."
+          }
+        }
+      }
+    },
+    "Kompakt mit den wichtigsten Details" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Concise, with the most important details"
+          }
+        }
+      }
+    },
+    "Konfiguration fehlt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuration missing"
+          }
+        }
+      }
+    },
+    "Konfigurierbares TLS-Ziel und Token im iOS-Keychain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configurable TLS destination and token in the iOS Keychain"
+          }
+        }
+      }
+    },
+    "Kurz" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short"
+          }
+        }
+      }
+    },
+    "Mit %@ sprechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Talk to %@"
+          }
+        }
+      }
+    },
+    "Natürlich sprechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak naturally"
+          }
+        }
+      }
+    },
+    "Neue Unterhaltung" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New conversation"
+          }
+        }
+      }
+    },
+    "Nicht verbunden" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not connected"
+          }
+        }
+      }
+    },
+    "Noch kein Token gespeichert." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No token saved yet."
+          }
+        }
+      }
+    },
+    "Normal" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Normal"
+          }
+        }
+      }
+    },
+    "Öffne die Einstellungen, um die verschlüsselte Verbindung einzurichten." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Settings to configure the encrypted connection."
+          }
+        }
+      }
+    },
+    "OK" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "Pause" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        }
+      }
+    },
+    "Port" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Port"
+          }
+        }
+      }
+    },
+    "Schließen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        }
+      }
+    },
+    "Server" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Server"
+          }
+        }
+      }
+    },
+    "Sicher verbinden" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect securely"
+          }
+        }
+      }
+    },
+    "Sichere Verbindung" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secure connection"
+          }
+        }
+      }
+    },
+    "Sichere Verbindung wird geprüft …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking secure connection …"
+          }
+        }
+      }
+    },
+    "Sichern" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        }
+      }
+    },
+    "Sprache wird erkannt …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recognizing speech …"
+          }
+        }
+      }
+    },
+    "Sprechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speak"
+          }
+        }
+      }
+    },
+    "Startet eine neue Sprachaufnahme." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starts a new voice recording."
+          }
+        }
+      }
+    },
+    "Stoppt %@ und startet sofort eine neue Sprachaufnahme." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stops %@ and immediately starts a new voice recording."
+          }
+        }
+      }
+    },
+    "TalkToHermes" : {
+
+    },
+    "TalkToHermes-Fehler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TalkToHermes Error"
+          }
+        }
+      }
+    },
+    "Tippe erneut, wenn du fertig bist." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap again when you're finished."
+          }
+        }
+      }
+    },
+    "Token sicher gespeichert. Leer lassen, um ihn beizubehalten." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token stored securely. Leave blank to keep it."
+          }
+        }
+      }
+    },
+    "Unbekannter Fehler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown error"
+          }
+        }
+      }
+    },
+    "Unterbrechen und sprechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrupt and speak"
+          }
+        }
+      }
+    },
+    "Verbindung unterbrochen – Turn bitte abbrechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection interrupted – please cancel the turn"
+          }
+        }
+      }
+    },
+    "Verbindung wird geprüft …" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking connection …"
+          }
+        }
+      }
+    },
+    "Version" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        }
+      }
+    },
+    "Vorgang abbrechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel operation"
+          }
+        }
+      }
+    },
+    "Was möchtest du wissen?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "What would you like to know?"
+          }
+        }
+      }
+    },
+    "Wiedergabe pausieren" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause playback"
+          }
+        }
+      }
+    },
+    "Wiedergabe stoppen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop playback"
+          }
+        }
+      }
+    },
+    "Zum Senden tippen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to send"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

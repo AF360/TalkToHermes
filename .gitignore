@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+backend/.env
+
+# Runtime data and secrets
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+runtime/
+artifacts/
+secrets/
+*.key
+*.pem
+*.p12
+*.mobileprovision
+
+# Private voice and audio assets
+private-voices/
+voice-assets/
+recordings/
+*.ogg
+*.wav
+*.m4a
+*.caf
+*.mp3
+
+# iOS / Xcode
+DerivedData/
+.build/
+xcuserdata/
+*.xcuserstate
+*.hmap
+*.ipa
+*.dSYM
+*.dSYM.zip
+timeline.xctimeline
+playground.xcworkspace
+Carthage/Build/
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Deployment test roots and release artifacts
+deployment/.archive-verify*/
+deployment/.install-root*/
+deployment/*.tar.gz
+
+# Editors / OS
+.DS_Store
+._*
+.vscode/
+.idea/
+*~

@@ -1,0 +1,14 @@
+primary-voice-server.home.arpa {
+	tls internal
+	reverse_proxy 127.0.0.1:8000
+}
+
+https://primary-voice-server.home.arpa:9443 {
+	tls internal
+	reverse_proxy 192.168.100.20:9090
+}
+
+https://primary-voice-server.home.arpa:9444 {
+	tls internal
+	reverse_proxy 127.0.0.1:5050
+}

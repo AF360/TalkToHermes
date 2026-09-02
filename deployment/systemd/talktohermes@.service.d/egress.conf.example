@@ -1,0 +1,6 @@
+# Copy to /etc/systemd/system/talktohermes@INSTANCE.service.d/egress.conf
+# only after replacing every placeholder with a verified site-local address.
+[Service]
+IPAddressAllow=DNS_RESOLVER_IP/32
+IPAddressAllow=PRIMARY_VOICE_SERVER_IP/32
+IPAddressAllow=FALLBACK_VOICE_SERVER_IP/32

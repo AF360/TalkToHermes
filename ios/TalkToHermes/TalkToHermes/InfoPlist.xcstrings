@@ -1,0 +1,36 @@
+{
+  "sourceLanguage" : "de",
+  "strings" : {
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "TalkToHermes"
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "comment" : "Privacy - Microphone Usage Description",
+      "extractionState" : "manual",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TalkToHermes benötigt das Mikrofon für Push-to-Talk-Sprachnachrichten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TalkToHermes needs microphone access for push-to-talk voice messages."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

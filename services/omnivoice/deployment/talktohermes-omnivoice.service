@@ -1,0 +1,52 @@
+[Unit]
+Description=TalkToHermes dedicated OmniVoice service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=talktohermes-omnivoice
+Group=talktohermes-omnivoice
+UMask=0077
+Environment=HF_HOME=/var/cache/talktohermes-omnivoice/huggingface
+ExecStart=/opt/talktohermes-omnivoice/venv/bin/talktohermes-omnivoice --config /etc/talktohermes-omnivoice/config.yaml
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=10min
+TimeoutStopSec=2min
+KillSignal=SIGTERM
+KillMode=mixed
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=false
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_UNIX AF_INET
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+StateDirectory=talktohermes-omnivoice
+CacheDirectory=talktohermes-omnivoice
+RuntimeDirectory=talktohermes-omnivoice
+ReadWritePaths=/var/lib/talktohermes-omnivoice /var/cache/talktohermes-omnivoice /run/talktohermes-omnivoice
+MemoryMax=24G
+TasksMax=256
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

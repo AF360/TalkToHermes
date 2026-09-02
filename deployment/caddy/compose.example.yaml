@@ -1,0 +1,20 @@
+# Merge this service fragment into the existing /opt/caddy Compose project.
+# Host networking is required: 127.0.0.1 must mean the host loopback where the
+# systemd bridge listens. Remove any conflicting `ports:` from the base service.
+services:
+  caddy:
+    container_name: caddy-hermesagent
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: local/caddy-hermesagent:2.11.4-cloudflare-a8737d095ad5
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - /opt/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

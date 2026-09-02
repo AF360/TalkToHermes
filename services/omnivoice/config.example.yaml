@@ -1,0 +1,13 @@
+listen_host: 192.168.100.20
+listen_port: 9090
+token_file: "/etc/talktohermes-omnivoice/token"
+model_name: k2-fsa/OmniVoice
+max_body_bytes: 16384
+max_text_chars: 2000
+max_wav_bytes: 33554432
+inference_timeout_seconds: 120
+voices:
+  <logical-voice-id>:
+    reference_audio: "<absolute-private-reference-wav-path>"
+    reference_transcript: "<absolute-private-transcript-path>"
+    language: de

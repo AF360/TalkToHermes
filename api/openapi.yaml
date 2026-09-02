@@ -1,0 +1,264 @@
+openapi: 3.1.0
+info:
+  title: TalkToHermes Voice Bridge
+  version: 1.0.1
+servers:
+  - url: https://hermes-agent.home.arpa:{port}
+    variables:
+      port:
+        default: "443"
+        description: Per-instance custom HTTPS port
+security:
+  - HTTPBearer: []
+paths:
+  /v1/status:
+    get:
+      operationId: bridge_status
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/StatusResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /v1/conversations:
+    post:
+      operationId: create_conversation
+      responses:
+        "201":
+          description: Conversation created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ConversationResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+  /v1/conversations/{conversation_id}:
+    parameters:
+      - {$ref: "#/components/parameters/ConversationId"}
+    get:
+      operationId: get_conversation
+      responses:
+        "200":
+          description: Conversation metadata
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ConversationResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+    delete:
+      operationId: delete_conversation
+      responses:
+        "204": {description: Mapping deleted}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "500": {description: Private audio cleanup failed; conversation retained for retry}
+        "503": {description: Active work did not quiesce before the bounded deletion deadline; retry later}
+  /v1/conversations/{conversation_id}/turns/text:
+    parameters:
+      - {$ref: "#/components/parameters/ConversationId"}
+    post:
+      operationId: create_text_turn
+      description: Development-only text integration route; absent in production.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/TextTurnRequest"}
+      responses:
+        "202":
+          description: Turn accepted
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TurnAcceptedResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /v1/conversations/{conversation_id}/turns:
+    parameters:
+      - {$ref: "#/components/parameters/ConversationId"}
+    post:
+      operationId: create_voice_turn
+      description: Accepts one private voice upload; content and options are fingerprinted for idempotency.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {$ref: "#/components/schemas/VoiceTurnRequest"}
+      responses:
+        "202":
+          description: Turn accepted or matching idempotent turn returned
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TurnAcceptedResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "413": {description: Audio exceeds 10 MiB}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /v1/turns/{turn_id}:
+    parameters:
+      - {$ref: "#/components/parameters/TurnId"}
+    get:
+      operationId: get_turn
+      responses:
+        "200":
+          description: Current turn state
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/TurnResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /v1/turns/{turn_id}/events:
+    parameters:
+      - {$ref: "#/components/parameters/TurnId"}
+    get:
+      operationId: turn_events
+      responses:
+        "200":
+          description: Ordered turn events
+          content:
+            text/event-stream:
+              schema: {type: string}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "422": {description: Invalid, negative, or future Last-Event-ID}
+  /v1/turns/{turn_id}/audio:
+    parameters:
+      - {$ref: "#/components/parameters/TurnId"}
+    get:
+      operationId: turn_audio
+      description: Completed WAV audio; the first successful request starts the configured retry grace lease.
+      responses:
+        "200":
+          description: Completed answer audio
+          content:
+            audio/wav:
+              schema: {type: string, format: binary}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+  /v1/turns/{turn_id}/approval:
+    parameters:
+      - {$ref: "#/components/parameters/TurnId"}
+    post:
+      operationId: approve_turn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ApprovalRequest"}
+      responses:
+        "204": {description: Approval resolved}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "409": {$ref: "#/components/responses/Conflict"}
+        "422": {$ref: "#/components/responses/ValidationError"}
+  /v1/turns/{turn_id}/cancel:
+    parameters:
+      - {$ref: "#/components/parameters/TurnId"}
+    post:
+      operationId: cancel_turn
+      responses:
+        "202":
+          description: Cancel accepted
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/StatusResponse"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+components:
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
+  parameters:
+    ConversationId:
+      name: conversation_id
+      in: path
+      required: true
+      schema: {type: string}
+    TurnId:
+      name: turn_id
+      in: path
+      required: true
+      schema: {type: string}
+  responses:
+    Unauthorized: {description: Invalid or missing app token}
+    NotFound: {description: Resource not found}
+    Conflict: {description: Idempotency or state conflict}
+    ValidationError: {description: Invalid request}
+  schemas:
+    StatusResponse:
+      type: object
+      additionalProperties: false
+      required: [status, instance_id]
+      properties:
+        status: {type: string}
+        instance_id: {type: string}
+    ConversationResponse:
+      type: object
+      additionalProperties: false
+      required: [conversation_id, created_at, updated_at]
+      properties:
+        conversation_id: {type: string}
+        created_at: {type: string}
+        updated_at: {type: string}
+    TextTurnRequest:
+      type: object
+      additionalProperties: false
+      required: [client_turn_id, text]
+      properties:
+        client_turn_id: {type: string, minLength: 1, maxLength: 128}
+        text: {type: string, minLength: 1, maxLength: 100000}
+        include_text: {type: boolean, default: true}
+    VoiceTurnRequest:
+      type: object
+      additionalProperties: false
+      required: [audio, client_turn_id]
+      properties:
+        audio:
+          type: string
+          format: binary
+          description: Maximum 10 MiB and 120 seconds. WAV is parsed directly; M4A/MP4, CAF and Ogg require matching container signatures and a bounded local ffprobe duration result.
+        client_turn_id: {type: string, format: uuid}
+        language:
+          type: string
+          pattern: '^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$'
+          default: de
+          description: Validated language tag forwarded to STT and TTS verification.
+        voice_id: {type: string, enum: [default], default: default}
+        include_text: {type: boolean, default: true}
+        response_style:
+          type: string
+          enum: [short, normal, detailed]
+          default: short
+          description: Selects the bounded spoken-response instruction overlay for this turn.
+    TurnAcceptedResponse:
+      type: object
+      additionalProperties: false
+      required: [turn_id, state, events_url]
+      properties:
+        turn_id: {type: string}
+        state: {type: string}
+        events_url: {type: string}
+    TurnResponse:
+      type: object
+      additionalProperties: false
+      required: [turn_id, conversation_id, client_turn_id, state, created_at, updated_at]
+      properties:
+        turn_id: {type: string}
+        conversation_id: {type: string}
+        client_turn_id: {type: string}
+        state: {type: string}
+        created_at: {type: string}
+        updated_at: {type: string}
+        response_text: {type: [string, "null"]}
+        error_code: {type: [string, "null"]}
+        degraded_local_audio: {type: boolean, default: false}
+    ApprovalRequest:
+      type: object
+      additionalProperties: false
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [once, deny]

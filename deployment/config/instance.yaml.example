@@ -1,0 +1,56 @@
+instance_id: INSTANCE
+profile: default
+development: false
+listen_host: 127.0.0.1
+listen_port: 18081
+state_dir: /var/lib/talktohermes/INSTANCE
+secret_file: /etc/talktohermes/INSTANCE.secrets
+
+hermes:
+  base_url: http://127.0.0.1:8642
+
+# Provider order is fallback order. Omit an optional middle provider to fall
+# straight through to the local last resort.
+stt:
+  - type: openai
+    url: https://primary-voice-server.home.arpa:9444/v1/audio/transcriptions
+    model: large-v3-turbo
+    # Bound only connection/TLS setup aggressively; inference may remain long.
+    connect_timeout_seconds: 0.5
+    response_timeout_seconds: 120
+    circuit_cooldown_seconds: 45
+
+  # Optional fallback server (192.168.100.30 in the documented example LAN).
+  - type: wyoming
+    url: tcp://fallback-voice-server.home.arpa:10300
+
+  - type: local
+    model: small
+
+tts:
+  - type: omnivoice
+    url: https://primary-voice-server.home.arpa:9443/v1/audio/speech
+    voice: voice-01
+    connect_timeout_seconds: 0.5
+    response_timeout_seconds: 120
+    circuit_cooldown_seconds: 45
+
+  # Use a dedicated warm Piper process/port on the fallback voice server for each conversational voice.
+  # Example: Hermes :10201, second instance :10202.
+  - type: wyoming-piper
+    url: tcp://fallback-voice-server.home.arpa:10201
+    voice: de_DE-thorsten-medium
+
+  - type: local-piper
+    voice: de_DE-ramona-low
+
+voice_worker:
+  python: /home/INSTANCE/.hermes/hermes-agent/venv/bin/talktohermes-python
+  script: /opt/talktohermes/current/backend/worker/hermes_voice_worker.py
+  hermes_root: /home/INSTANCE/.hermes/hermes-agent
+
+retain_failed_audio: true
+failed_audio_retention_hours: 24
+text_retention_hours: 24
+# Discovery heartbeat; exact known text expiries are scheduled sooner.
+cleanup_interval_seconds: 900

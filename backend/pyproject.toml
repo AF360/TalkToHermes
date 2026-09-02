@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "talktohermes"
+version = "1.0.1"
+description = "Narrow multi-instance iOS voice bridge for Hermes Agent"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "fastapi==0.133.1",
+  "httpx==0.28.1",
+  "pydantic==2.13.4",
+  "python-multipart==0.0.32",
+  "pyyaml==6.0.3",
+  "uvicorn==0.41.0",
+]
+
+[project.scripts]
+talktohermes-production = "talktohermes.production:main"
+
+[dependency-groups]
+dev = [
+  "flask==3.1.2",
+  "pytest==9.1.1",
+  "pytest-asyncio==1.3.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/talktohermes"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+asyncio_mode = "auto"

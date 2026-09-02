@@ -1,0 +1,46 @@
+instance_id: INSTANCE
+profile: default
+development: false
+listen_host: 127.0.0.1
+listen_port: 18081
+state_dir: /home/INSTANCE/.local/state/talktohermes/INSTANCE
+secret_file: /home/INSTANCE/.config/talktohermes/INSTANCE.secrets
+
+hermes:
+  base_url: http://127.0.0.1:8642
+
+stt:
+  - type: openai
+    url: https://primary-voice-server.home.arpa:9444/v1/audio/transcriptions
+    model: large-v3-turbo
+    connect_timeout_seconds: 0.5
+    response_timeout_seconds: 120
+    circuit_cooldown_seconds: 45
+  - type: wyoming
+    url: tcp://fallback-voice-server.home.arpa:10300
+  - type: local
+    model: small
+
+tts:
+  - type: omnivoice
+    url: https://primary-voice-server.home.arpa:9443/v1/audio/speech
+    voice: voice-01
+    connect_timeout_seconds: 0.5
+    response_timeout_seconds: 120
+    circuit_cooldown_seconds: 45
+  - type: wyoming-piper
+    url: tcp://fallback-voice-server.home.arpa:10201
+    voice: de_DE-thorsten-medium
+  - type: local-piper
+    voice: de_DE-ramona-low
+
+voice_worker:
+  python: /home/INSTANCE/.hermes/hermes-agent/venv/bin/talktohermes-python
+  script: /home/INSTANCE/.local/opt/talktohermes/current/backend/worker/hermes_voice_worker.py
+  hermes_root: /home/INSTANCE/.hermes/hermes-agent
+
+retain_failed_audio: true
+failed_audio_retention_hours: 24
+text_retention_hours: 24
+# Discovery heartbeat; exact known text expiries are scheduled sooner.
+cleanup_interval_seconds: 900
