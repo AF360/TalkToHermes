@@ -10,6 +10,15 @@ nonisolated enum VoiceBottomBarMode: Equatable, Sendable {
     case stacked
 }
 
+nonisolated enum NewConversationDecision: Equatable, Sendable {
+    case cancel
+    case confirm
+
+    var startsNewConversation: Bool {
+        self == .confirm
+    }
+}
+
 nonisolated enum ChatAutoScroll {
     static func shouldRevealApproval(from previous: Bool, to current: Bool) -> Bool {
         !previous && current
@@ -19,6 +28,8 @@ nonisolated enum ChatAutoScroll {
 nonisolated struct VoiceLayoutMetrics: Equatable, Sendable {
     let mode: VoiceLayoutMode
     let orbDiameter: CGFloat
+    let toolbarOrbDiameter: CGFloat?
+    let showsInlineVoiceOrb: Bool
     let recordButtonDiameter: CGFloat
 }
 
@@ -36,12 +47,16 @@ nonisolated enum VoiceLayout {
             return VoiceLayoutMetrics(
                 mode: .wide,
                 orbDiameter: 76,
+                toolbarOrbDiameter: nil,
+                showsInlineVoiceOrb: false,
                 recordButtonDiameter: 88
             )
         }
         return VoiceLayoutMetrics(
             mode: .compact,
             orbDiameter: 104,
+            toolbarOrbDiameter: 38,
+            showsInlineVoiceOrb: false,
             recordButtonDiameter: 72
         )
     }

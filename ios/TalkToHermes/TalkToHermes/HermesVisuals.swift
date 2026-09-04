@@ -72,6 +72,11 @@ struct HermesVoiceOrb: View {
 
     private var isActive: Bool { isRecording || isBusy || isPlaying }
     private var accent: Color { isRecording ? .red : .hermesCopper }
+    private var isToolbarSized: Bool { diameter < 60 }
+    private var waveformSpacing: CGFloat { isToolbarSized ? 2 : 8 }
+    private var waveformBarWidth: CGFloat {
+        isToolbarSized ? max(2, diameter * 0.05) : max(5, diameter * 0.034)
+    }
 
     var body: some View {
         ZStack {
@@ -92,18 +97,22 @@ struct HermesVoiceOrb: View {
                     )
                 )
                 .frame(width: diameter * 0.63, height: diameter * 0.63)
-                .shadow(color: accent.opacity(0.34), radius: 28, y: 12)
+                .shadow(
+                    color: accent.opacity(0.34),
+                    radius: isToolbarSized ? 7 : 28,
+                    y: isToolbarSized ? 3 : 12
+                )
                 .overlay {
                     Circle()
                         .stroke(.white.opacity(0.42), lineWidth: 1)
                 }
 
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: waveformSpacing) {
                 ForEach(Array([0.42, 0.72, 1.0, 0.72, 0.42].enumerated()), id: \.offset) { index, factor in
                     Capsule()
                         .fill(Color.hermesGraphite.opacity(0.94))
                         .frame(
-                            width: max(5, diameter * 0.034),
+                            width: waveformBarWidth,
                             height: diameter * 0.23 * factor * (isRecording ? max(level, 0.35) : 1)
                         )
                         .animation(
@@ -113,7 +122,7 @@ struct HermesVoiceOrb: View {
                 }
             }
         }
-        .frame(height: diameter + 14)
+        .frame(height: diameter + (isToolbarSized ? 6 : 14))
         .accessibilityHidden(true)
         .onAppear { updatePulse() }
         .onChange(of: isActive) { _, _ in updatePulse() }

@@ -112,11 +112,18 @@ struct VoiceWorkflowTests {
         #expect(VoiceLayout.pinsBrandHeader(for: .compact))
     }
 
-    @Test func usesCompactVoiceStageOnIPhoneWidth() {
+    @Test func requiresExplicitConfirmationBeforeStartingNewConversation() {
+        #expect(NewConversationDecision.cancel.startsNewConversation == false)
+        #expect(NewConversationDecision.confirm.startsNewConversation)
+    }
+
+    @Test func usesCompactToolbarOrbOnIPhoneWidth() {
         let metrics = VoiceLayout.metrics(for: 390)
 
         #expect(metrics.mode == .compact)
         #expect(metrics.orbDiameter == 104)
+        #expect(metrics.toolbarOrbDiameter == 38)
+        #expect(metrics.showsInlineVoiceOrb == false)
         #expect(metrics.recordButtonDiameter == 72)
     }
 

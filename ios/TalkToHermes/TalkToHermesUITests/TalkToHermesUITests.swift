@@ -61,6 +61,26 @@ final class TalkToHermesUITests: XCTestCase {
     }
 
     @MainActor
+    func testConfirmsBeforeStartingNewConversation() throws {
+        let app = XCUIApplication()
+        app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
+        app.launch()
+
+        let newConversationButton = app.buttons["Neue Unterhaltung"].firstMatch
+        XCTAssertTrue(newConversationButton.waitForExistence(timeout: 3))
+        newConversationButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Neue Unterhaltung starten?"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Der aktuell angezeigte Chat wird gelöscht."].exists)
+        XCTAssertTrue(app.buttons["Abbrechen"].exists)
+        XCTAssertTrue(app.buttons["Neue Unterhaltung"].exists)
+
+        app.buttons["Abbrechen"].tap()
+        XCTAssertFalse(app.staticTexts["Neue Unterhaltung starten?"].exists)
+        XCTAssertTrue(newConversationButton.exists)
+    }
+
+    @MainActor
     func testOpensSecureConnectionSettings() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]

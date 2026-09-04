@@ -5,6 +5,7 @@ struct ContentView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @StateObject private var model = VoiceViewModel()
     @State private var showsSettings = false
+    @State private var showsNewConversationConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -38,12 +39,23 @@ struct ContentView: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
-                            model.newConversation()
+                            showsNewConversationConfirmation = true
                         } label: {
                             Image(systemName: "square.and.pencil")
                         }
                         .accessibilityLabel("Neue Unterhaltung")
                         .disabled(locksNavigation)
+                    }
+                    ToolbarItem(placement: .principal) {
+                        if let diameter = metrics.toolbarOrbDiameter {
+                            HermesVoiceOrb(
+                                isRecording: model.recorder.isRecording,
+                                isBusy: model.isBusy || model.isStartingRecording || model.isRefreshingConfiguration,
+                                isPlaying: model.isPlaying,
+                                level: model.recorder.level,
+                                diameter: diameter
+                            )
+                        }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -60,6 +72,20 @@ struct ContentView: View {
                     Task { await model.refreshConfiguration() }
                 }) {
                     SettingsView()
+                }
+                .confirmationDialog(
+                    "Neue Unterhaltung starten?",
+                    isPresented: $showsNewConversationConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Neue Unterhaltung", role: .destructive) {
+                        handleNewConversation(.confirm)
+                    }
+                    Button("Abbrechen", role: .cancel) {
+                        handleNewConversation(.cancel)
+                    }
+                } message: {
+                    Text("Der aktuell angezeigte Chat wird gelöscht.")
                 }
                 .task {
                     await model.refreshConfiguration()
@@ -95,7 +121,10 @@ struct ContentView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 16) {
-                        voiceStage(diameter: metrics.orbDiameter)
+                        voiceStage(
+                            diameter: metrics.orbDiameter,
+                            showsOrb: metrics.showsInlineVoiceOrb
+                        )
                         conversationContent
                         chatBottomAnchor
                     }
@@ -247,6 +276,11 @@ struct ContentView: View {
         model.canCancel || model.recorder.isRecording
     }
 
+    private func handleNewConversation(_ decision: NewConversationDecision) {
+        guard decision.startsNewConversation else { return }
+        model.newConversation()
+    }
+
     private var brandHeader: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .center) {
@@ -272,15 +306,17 @@ struct ContentView: View {
         }
     }
 
-    private func voiceStage(diameter: CGFloat) -> some View {
+    private func voiceStage(diameter: CGFloat, showsOrb: Bool = true) -> some View {
         VStack(spacing: 2) {
-            HermesVoiceOrb(
-                isRecording: model.recorder.isRecording,
-                isBusy: model.isBusy || model.isStartingRecording || model.isRefreshingConfiguration,
-                isPlaying: model.isPlaying,
-                level: model.recorder.level,
-                diameter: diameter
-            )
+            if showsOrb {
+                HermesVoiceOrb(
+                    isRecording: model.recorder.isRecording,
+                    isBusy: model.isBusy || model.isStartingRecording || model.isRefreshingConfiguration,
+                    isPlaying: model.isPlaying,
+                    level: model.recorder.level,
+                    diameter: diameter
+                )
+            }
 
             Text(stageTitle)
                 .font(.title2.weight(.semibold))

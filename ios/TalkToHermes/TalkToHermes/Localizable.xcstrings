@@ -81,6 +81,16 @@
         }
       }
     },
+    "Abbrechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
     "Ablehnen" : {
       "localizations" : {
         "en" : {
@@ -400,6 +410,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The token is never shown in plain text when loaded."
+          }
+        }
+      }
+    },
+    "Der aktuell angezeigte Chat wird gelöscht." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The currently displayed chat will be deleted."
           }
         }
       }
@@ -800,6 +820,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "New conversation"
+          }
+        }
+      }
+    },
+    "Neue Unterhaltung starten?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a new conversation?"
           }
         }
       }
