@@ -16,12 +16,14 @@ final class VoiceViewModel: ObservableObject {
     @Published private(set) var degradedAudio = false
     @Published private(set) var isPlaying = false
     @Published private(set) var hasPlayableResponse = false
+    @Published private(set) var chatHistory = ChatHistory()
     @Published var errorMessage: String?
 
     let recorder = VoiceRecorder()
 
     private let settingsStore: SettingsStore
     private var client: APIClient?
+    private var bridgeIdentity: BridgeIdentity?
     private var conversationID: String?
     private var currentTurnID: String?
     private var monitorTask: Task<Void, Never>?
@@ -29,6 +31,7 @@ final class VoiceViewModel: ObservableObject {
     private var recordingLimitTask: Task<Void, Never>?
     private var player: AVAudioPlayer?
     private var playbackTask: Task<Void, Never>?
+    private var responseAudioGuard = ResponseAudioGuard()
     private var configurationRefreshGeneration = 0
 
     init(settingsStore: SettingsStore = SettingsStore()) {
@@ -38,14 +41,6 @@ final class VoiceViewModel: ObservableObject {
     var canSpeak: Bool {
         isReady && !isBusy && !isStartingRecording && !isRefreshingConfiguration &&
         !canCancel && !approvalRequired
-    }
-
-    private static func displayName(from instanceID: String) -> String {
-        let displayName = instanceID
-            .split(separator: "-", omittingEmptySubsequences: true)
-            .map { $0.prefix(1).uppercased() + String($0.dropFirst()) }
-            .joined(separator: " ")
-        return displayName.isEmpty ? "Hermes" : displayName
     }
 
     func refreshConfiguration() async {
@@ -78,11 +73,21 @@ final class VoiceViewModel: ObservableObject {
             guard status.status == "ready" else {
                 throw APIClientError.invalidResponse
             }
-            assistantName = Self.displayName(from: status.instanceID)
-            if client?.endpoint != newClient.endpoint {
+            let newIdentity = BridgeIdentity(
+                endpoint: newClient.endpoint,
+                instanceID: status.instanceID,
+                assistantName: status.assistantName
+            )
+            if BridgeIdentity.requiresConversationReset(from: bridgeIdentity, to: newIdentity) {
+                invalidatePendingResponseAudio()
                 conversationID = nil
                 currentTurnID = nil
+                apply(.reset)
+                chatHistory.removeAll()
+                stopPlayback(clearAudio: true)
             }
+            bridgeIdentity = newIdentity
+            assistantName = status.assistantName
             client = newClient
             isReady = true
             statusText = String(localized: "Bereit")
@@ -111,6 +116,7 @@ final class VoiceViewModel: ObservableObject {
             }
         } else {
             guard !isStartingRecording else { return }
+            invalidatePendingResponseAudio()
             if isPlaying {
                 stopResponsePlayback()
             }
@@ -156,6 +162,7 @@ final class VoiceViewModel: ObservableObject {
     }
 
     func cancelTurn() {
+        responseAudioGuard.invalidate()
         recordingStartTask?.cancel()
         recordingStartTask = nil
         isStartingRecording = false
@@ -196,11 +203,12 @@ final class VoiceViewModel: ObservableObject {
 
     func newConversation() {
         guard !isBusy, !isStartingRecording, !canCancel, !recorder.isRecording else { return }
+        invalidatePendingResponseAudio()
         let previous = conversationID
         conversationID = nil
         currentTurnID = nil
-        responseText = ""
-        degradedAudio = false
+        apply(.reset)
+        chatHistory.removeAll()
         stopPlayback(clearAudio: true)
         statusText = isReady ? String(localized: "Bereit") : statusText
         guard let client, let previous else { return }
@@ -214,6 +222,11 @@ final class VoiceViewModel: ObservableObject {
                 )
             }
         }
+    }
+
+    func prepareForSettings() {
+        invalidatePendingResponseAudio()
+        stopResponsePlayback()
     }
 
     func togglePlayback() {
@@ -245,6 +258,7 @@ final class VoiceViewModel: ObservableObject {
     }
 
     private func beginSubmission(recordingURL: URL) {
+        responseAudioGuard.invalidate()
         monitorTask?.cancel()
         stopPlayback(clearAudio: true)
         isBusy = true
@@ -310,15 +324,29 @@ final class VoiceViewModel: ObservableObject {
                 return
             case .completed:
                 responseText = turn.responseText ?? ""
+                chatHistory.append(turn, assistantName: assistantName)
                 degradedAudio = turn.degradedLocalAudio
                 statusText = turn.degradedLocalAudio
                     ? String(localized: "Antwort bereit (Fallback-Stimme)")
                     : String(localized: "Antwort bereit")
-                let audio = try await client.audio(turnID)
-                try play(audio)
-                currentTurnID = nil
-                canCancel = false
-                isBusy = false
+                let audioTicket = responseAudioGuard.makeTicket()
+                apply(.completed)
+                do {
+                    let audio = try await client.audio(turnID)
+                    try Task.checkCancellation()
+                    guard responseAudioGuard.accepts(audioTicket) else { return }
+                    try play(audio)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    guard responseAudioGuard.accepts(audioTicket) else { return }
+                    stopPlayback(clearAudio: true)
+                    statusText = String(localized: "Antwort bereit – Audio nicht verfügbar")
+                    errorMessage = String(
+                        format: String(localized: "Die Antwort ist verfügbar, konnte aber nicht abgespielt werden: %@"),
+                        error.localizedDescription
+                    )
+                }
                 return
             case .failed:
                 currentTurnID = nil
@@ -380,6 +408,23 @@ final class VoiceViewModel: ObservableObject {
             statusText = String(localized: "Fehler")
         }
         errorMessage = error.localizedDescription
+    }
+
+    private func apply(_ state: VoiceTurnControlState) {
+        currentTurnID = state.currentTurnID
+        canCancel = state.canCancel
+        isBusy = state.isBusy
+    }
+
+    private func apply(_ state: VoiceSessionPresentationState) {
+        responseText = state.responseText
+        degradedAudio = state.degradedAudio
+    }
+
+    private func invalidatePendingResponseAudio() {
+        responseAudioGuard.invalidate()
+        monitorTask?.cancel()
+        monitorTask = nil
     }
 
     private func waitForCancellation(turnID: String, client: APIClient) async throws {

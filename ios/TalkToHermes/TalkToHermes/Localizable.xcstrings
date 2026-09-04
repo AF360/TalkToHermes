@@ -111,6 +111,16 @@
         }
       }
     },
+    "Antwort bereit – Audio nicht verfügbar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response ready – audio unavailable"
+          }
+        }
+      }
+    },
     "Antwort bereit (Fallback-Stimme)" : {
       "localizations" : {
         "en" : {
@@ -444,6 +454,16 @@
         }
       }
     },
+    "Die Antwort ist verfügbar, konnte aber nicht abgespielt werden: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The response is available but could not be played: %@"
+          }
+        }
+      }
+    },
     "Die Aufnahme ist zu groß zum Übertragen." : {
       "localizations" : {
         "en" : {
@@ -704,12 +724,12 @@
         }
       }
     },
-    "Knopf nicht gedrückt halten: einmal zum Starten tippen, einmal zum Senden. %@ antwortet anschließend automatisch per Sprache." : {
+    "Knopf nicht gedrückt halten: einmal zum Starten tippen, einmal zum Senden. Danach antwortet %@ automatisch per Sprache." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "There is no need to hold a button: tap once to start and once to send. %@ then responds automatically with speech."
+            "value" : "There is no need to hold a button: tap once to start and once to send. Afterward, %@ responds automatically with speech."
           }
         }
       }
@@ -1023,6 +1043,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Checking connection …"
+          }
+        }
+      }
+    },
+    "Verwendete Tools: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tools used: %@"
           }
         }
       }

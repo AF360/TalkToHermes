@@ -22,6 +22,18 @@ def _methods(spec: dict) -> dict[str, set[str]]:
     }
 
 
+def _without_titles(value):
+    if isinstance(value, dict):
+        return {
+            key: _without_titles(item)
+            for key, item in value.items()
+            if key != "title"
+        }
+    if isinstance(value, list):
+        return [_without_titles(item) for item in value]
+    return value
+
+
 def test_static_openapi_matches_development_app_surface(tmp_path: Path) -> None:
     settings = load_settings(write_instance(tmp_path))
     app = create_app(
@@ -40,6 +52,22 @@ def test_static_openapi_matches_development_app_surface(tmp_path: Path) -> None:
     assert generated["components"]["securitySchemes"]["HTTPBearer"] == {
         "type": "http",
         "scheme": "bearer",
+    }
+    for schema_name in ("StatusResponse", "CancelResponse", "TurnResponse"):
+        assert _without_titles(static["components"]["schemas"][schema_name]) == _without_titles(
+            generated["components"]["schemas"][schema_name]
+        )
+
+
+def test_turn_response_documents_chat_transcript_and_tool_names() -> None:
+    static = yaml.safe_load((ROOT / "api/openapi.yaml").read_text(encoding="utf-8"))
+    properties = static["components"]["schemas"]["TurnResponse"]["properties"]
+    assert properties["input_text"] == {
+        "anyOf": [{"type": "string"}, {"type": "null"}]
+    }
+    assert properties["tools"] == {
+        "type": "array",
+        "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{0,63}$"},
     }
 
 

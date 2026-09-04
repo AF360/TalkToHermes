@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+ExposedToolName = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9]{0,63}$")]
 
 
 class ConversationResponse(StrictModel):
@@ -35,6 +38,8 @@ class TurnResponse(StrictModel):
     created_at: str
     updated_at: str
     response_text: str | None = None
+    input_text: str | None = None
+    tools: list[ExposedToolName] = Field(default_factory=list)
     error_code: str | None = None
     degraded_local_audio: bool = False
 
@@ -46,6 +51,11 @@ class ApprovalRequest(StrictModel):
 class StatusResponse(StrictModel):
     status: str
     instance_id: str
+    assistant_name: str = Field(min_length=1, max_length=64)
+
+
+class CancelResponse(StrictModel):
+    status: Literal["cancelled"]
 
 
 class ErrorDetail(StrictModel):

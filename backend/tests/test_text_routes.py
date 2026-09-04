@@ -64,6 +64,19 @@ def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_authenticated_status_exposes_configured_assistant_name(tmp_path: Path) -> None:
+    client, token, _, _ = configured_client(tmp_path)
+
+    response = client.get("/v1/status", headers=auth(token))
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready",
+        "instance_id": "instance-a",
+        "assistant_name": "Klaus",
+    }
+
+
 def test_conversation_and_text_turn_complete_in_real_mapping(tmp_path: Path) -> None:
     client, token, storage, hermes = configured_client(tmp_path)
     conversation_response = client.post("/v1/conversations", headers=auth(token))
@@ -204,6 +217,7 @@ def test_include_text_false_redacts_response_and_delta_events(tmp_path: Path) ->
     turn = client.get(f"/v1/turns/{turn_id}", headers=auth(token))
     events = client.get(f"/v1/turns/{turn_id}/events", headers=auth(token))
     assert "response_text" not in turn.json()
+    assert "input_text" not in turn.json()
     assert "raw transcript" not in events.text
     assert "Hallo Welt" not in events.text
     assert "hermes.delta" not in events.text

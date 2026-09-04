@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import uuid
 from dataclasses import dataclass
@@ -10,6 +11,8 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from .response_style import RESPONSE_STYLES
+
+TOOL_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9]{0,63}")
 
 T = TypeVar("T")
 
@@ -71,6 +74,8 @@ class Turn:
         }
         if self.response_text is not None and self.include_text:
             result["response_text"] = self.response_text
+        if self.input_text and self.include_text:
+            result["input_text"] = self.input_text
         if self.error_code is not None:
             result["error_code"] = self.error_code
         result["degraded_local_audio"] = bool(self.degraded_local_audio)
@@ -660,3 +665,23 @@ class Storage:
             )
             for row in rows
         ]
+
+    def list_tool_names(self, turn_id: str) -> list[str]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT payload_json FROM events
+                   WHERE turn_id = ? AND event_type = 'hermes.tool_started'
+                   ORDER BY sequence""",
+                (turn_id,),
+            ).fetchall()
+        tools: list[str] = []
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            tool = payload.get("tool") if isinstance(payload, dict) else None
+            if (
+                isinstance(tool, str)
+                and TOOL_NAME_RE.fullmatch(tool)
+                and tool not in tools
+            ):
+                tools.append(tool)
+        return tools

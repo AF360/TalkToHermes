@@ -125,6 +125,11 @@ def test_instance_example_has_loopback_hermes_and_only_placeholders() -> None:
     config = yaml.safe_load(config_text)
     assert config["hermes"]["base_url"] == "http://127.0.0.1:8642"
     assert config["listen_host"] == "127.0.0.1"
+    assert config["assistant_name"] == "ASSISTANT_NAME"
+    assert config["exposed_tools"] == {
+        "OpenCodeTool": "OpenCodeTool",
+        "functions.browser_exec": "BrowserTool",
+    }
     assert config["state_dir"] == "/var/lib/talktohermes/INSTANCE"
     assert config["secret_file"] == "/etc/talktohermes/INSTANCE.secrets"
     assert "api_key" not in config["hermes"]
@@ -161,6 +166,11 @@ def test_user_instance_example_matches_user_service_paths() -> None:
     config = yaml.safe_load(read("config/instance.user.yaml.example"))
     assert config["state_dir"] == "/home/INSTANCE/.local/state/talktohermes/INSTANCE"
     assert config["secret_file"] == "/home/INSTANCE/.config/talktohermes/INSTANCE.secrets"
+    assert config["assistant_name"] == "ASSISTANT_NAME"
+    assert config["exposed_tools"] == {
+        "OpenCodeTool": "OpenCodeTool",
+        "functions.browser_exec": "BrowserTool",
+    }
     assert config["voice_worker"]["script"] == (
         "/home/INSTANCE/.local/opt/talktohermes/current/backend/worker/"
         "hermes_voice_worker.py"
@@ -279,6 +289,39 @@ def test_user_deploy_builds_venv_only_at_final_release_path() -> None:
     assert move in script and sync in script
     assert script.index(move) < script.index(sync)
     assert '--project "$stage/backend"' not in script
+
+
+def test_user_deploy_migrates_config_transactionally_and_checks_status() -> None:
+    script = (ROOT / "deployment" / "scripts" / "deploy-hermes-agent-user.sh").read_text(
+        encoding="utf-8"
+    )
+    backup = 'cp -p "$config" "$backup/config"'
+    validate = 'candidate_port=$("$release/backend/.venv/bin/python" - "$config_to_validate"'
+    install_config = 'install -m 0600 "$candidate_config" "$config"'
+    switch_release = 'ln -sfn "$release" "$current"'
+    restore_config = 'cp -p "$backup/config" "$config"'
+    authenticated_status = 'response = client.get(url, headers=headers)'
+    explicit_auth_failure = 'raise RuntimeError("unauthenticated status request did not return 401")'
+    explicit_contract_failure = 'raise RuntimeError("authenticated status response violated contract")'
+    commit_transaction = "transaction_active=0"
+
+    for marker in (
+        backup,
+        validate,
+        install_config,
+        switch_release,
+        restore_config,
+        authenticated_status,
+        explicit_auth_failure,
+        explicit_contract_failure,
+    ):
+        assert marker in script
+    assert "assert client.get(" not in script
+    assert "assert response.json()" not in script
+    assert script.index(backup) < script.index(validate)
+    assert script.index(validate) < script.index(install_config)
+    assert script.index(install_config) < script.index(switch_release)
+    assert script.index(authenticated_status) < script.rindex(commit_transaction)
 
 
 def test_runbook_installs_the_tracked_egress_template_and_provider_ca() -> None:

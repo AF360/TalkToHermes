@@ -51,6 +51,21 @@ struct HermesVoiceOrb: View {
     let isBusy: Bool
     let isPlaying: Bool
     let level: Double
+    let diameter: CGFloat
+
+    init(
+        isRecording: Bool,
+        isBusy: Bool,
+        isPlaying: Bool,
+        level: Double,
+        diameter: CGFloat = 236
+    ) {
+        self.isRecording = isRecording
+        self.isBusy = isBusy
+        self.isPlaying = isPlaying
+        self.level = level
+        self.diameter = diameter
+    }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pulses = false
@@ -62,11 +77,11 @@ struct HermesVoiceOrb: View {
         ZStack {
             Circle()
                 .fill(accent.opacity(0.10))
-                .frame(width: 236, height: 236)
+                .frame(width: diameter, height: diameter)
                 .scaleEffect(pulses && isActive ? 1.08 : 0.92)
             Circle()
                 .fill(accent.opacity(0.14))
-                .frame(width: 194, height: 194)
+                .frame(width: diameter * 0.82, height: diameter * 0.82)
                 .scaleEffect(pulses && isActive ? 0.96 : 1.04)
             Circle()
                 .fill(
@@ -76,7 +91,7 @@ struct HermesVoiceOrb: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: 148, height: 148)
+                .frame(width: diameter * 0.63, height: diameter * 0.63)
                 .shadow(color: accent.opacity(0.34), radius: 28, y: 12)
                 .overlay {
                     Circle()
@@ -88,8 +103,8 @@ struct HermesVoiceOrb: View {
                     Capsule()
                         .fill(Color.hermesGraphite.opacity(0.94))
                         .frame(
-                            width: 8,
-                            height: 54 * factor * (isRecording ? max(level, 0.35) : 1)
+                            width: max(5, diameter * 0.034),
+                            height: diameter * 0.23 * factor * (isRecording ? max(level, 0.35) : 1)
                         )
                         .animation(
                             reduceMotion ? nil : .spring(response: 0.18, dampingFraction: 0.62).delay(Double(index) * 0.015),
@@ -98,7 +113,7 @@ struct HermesVoiceOrb: View {
                 }
             }
         }
-        .frame(height: 250)
+        .frame(height: diameter + 14)
         .accessibilityHidden(true)
         .onAppear { updatePulse() }
         .onChange(of: isActive) { _, _ in updatePulse() }

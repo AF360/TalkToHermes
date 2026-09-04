@@ -82,6 +82,21 @@ def test_events_are_monotonic_and_survive_reopen(tmp_path: Path) -> None:
     assert [event.sequence for event in reopened.list_events(turn.id)] == [1, 2]
 
 
+def test_tool_names_query_is_ordered_unique_and_safe(tmp_path: Path) -> None:
+    db = storage(tmp_path)
+    conversation = db.create_conversation("hs-1")
+    turn, _ = db.create_or_get_text_turn(conversation.id, "client-1", "Hallo")
+    db.append_event(turn.id, "hermes.delta", {"delta": "/private/path"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": "BrowserTool"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": "token:sk_live_private"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": "invalid tool"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": 42})
+
+    assert db.list_tool_names(turn.id) == ["OpenCodeTool", "BrowserTool"]
+
+
 def test_turn_can_be_completed_without_returning_audio_path(tmp_path: Path) -> None:
     db = storage(tmp_path)
     conversation = db.create_conversation("hs-1")

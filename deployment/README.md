@@ -52,7 +52,7 @@ Required when `type: omnivoice` is configured. Use the official [OmniVoice repos
 
 Three transactional scripts cover the three runtime subsystems. They validate prerequisites before replacing files, keep a rollback copy until the real health check passes, and never carry credentials in command arguments:
 
-- `deployment/scripts/deploy-hermes-agent-user.sh INSTANCE [REVISION]` — run from a checkout containing the requested revision as the unprivileged bridge user. It creates an immutable Git-archive release, installs the systemd user unit, restarts the named bridge, and verifies its loopback health endpoint.
+- `deployment/scripts/deploy-hermes-agent-user.sh INSTANCE [REVISION] [CANDIDATE_CONFIG]` — run from a checkout containing the requested revision as the unprivileged bridge user. It creates an immutable Git-archive release, optionally validates and installs a private candidate YAML inside the same rollback transaction, installs the systemd user unit, restarts the named bridge, and verifies loopback health plus the authenticated status contract.
 - `deployment/scripts/deploy-primary-voice-server-user-services.sh [REPOSITORY_ROOT] [VOICE_HOST_IP] [REVISION]` — run on the GPU voice host as its unprivileged service user. It deploys both service packages and units from one resolved Git commit, restarts them sequentially, and verifies both health endpoints. Existing model caches, tokens, venvs, and configuration remain outside the replaced package directories. The documented example address defaults to `192.168.100.20`; private deployments pass their own LAN address explicitly.
 - `deployment/scripts/deploy-fallback-piper-user.sh INSTANCE VOICE PORT BIND_IP [SERVER_ROOT]` — run in the target macOS GUI session as the voice-service user. It installs a launchd agent and the warm-Piper supervisor, validates the selected local model, rejects occupied ports, performs an automatic synthesis warm-up, and rolls back if readiness fails.
 
@@ -73,13 +73,15 @@ cp deployment/config/instance.secrets.example \
 chmod 0600 "$HOME/.config/talktohermes/$INSTANCE.secrets"
 ```
 
-Replace every literal `INSTANCE` in the YAML with the dedicated Unix account, set that bridge's ordered providers and loopback port, and enter the four independent secret values in the `0600` secrets file. Do not put credentials in YAML or command arguments. Then deploy one reviewed Git revision:
+Replace every literal `INSTANCE` in the YAML with the dedicated Unix account, replace `ASSISTANT_NAME` with that bridge's printable, unpadded 1–64-character display identity, set the ordered providers and loopback port, and enter the four independent secret values in the `0600` secrets file. Do not put credentials in YAML or command arguments. Then deploy one reviewed Git revision:
 
 ```sh
-deployment/scripts/deploy-hermes-agent-user.sh "$INSTANCE" REVISION
+deployment/scripts/deploy-hermes-agent-user.sh "$INSTANCE" REVISION /absolute/path/to/candidate.yaml
 systemctl --user is-enabled "talktohermes@$INSTANCE.service"
 systemctl --user is-active "talktohermes@$INSTANCE.service"
 ```
+
+Omit the candidate path when configuration is unchanged. When it is supplied, the script requires a current-user-owned absolute regular file, validates it with the candidate release before switching code, installs it as mode `0600`, and restores the complete previous YAML before restarting the previous release if any later gate fails.
 
 For startup without an interactive login, an administrator performs the one-time host operation `loginctl enable-linger INSTANCE`. The user unit deliberately omits mount-namespace and cgroup-IP-firewall directives: an unprivileged user manager maps reviewed root-owned adapter paths to `nobody` when creating that namespace, causing the bridge's root-ownership gate to reject them. The process still runs as the dedicated unprivileged account with the remaining compatible restrictions.
 
@@ -152,7 +154,7 @@ An empty result is required for a new instance. For an upgrade, the known `talkt
 
    `uv` itself must be an administrator-reviewed pinned installation. If the target is offline, pre-populate the reviewed uv cache and add `--offline`; do not remove `--frozen` or fall back to network-resolved `pip install`.
 
-3. Copy `config/instance.yaml.example`, replace every `INSTANCE`, select the checked bridge port, and set the ordered provider lists. Keep `development: false`; only the bridge and Hermes URLs are loopback. Omit unavailable optional fallback providers instead of configuring dummy endpoints:
+3. Copy `config/instance.yaml.example`, replace every `INSTANCE` and `ASSISTANT_NAME`, select the checked bridge port, set `assistant_name` explicitly to that bridge's printable, unpadded 1–64-character display identity, curate the fail-closed `exposed_tools` mapping, and set the ordered provider lists. Only mapped tool identifiers are returned to the app; unknown tools remain private. Keep `development: false`; only the bridge and Hermes URLs are loopback. Omit unavailable optional fallback providers instead of configuring dummy endpoints:
 
    ```sh
    install -d -o root -g root -m 0755 /etc/talktohermes
@@ -305,8 +307,10 @@ Finally run one representative create/voice/status/audio flow through HTTPS. Con
 
 1. Build and fully test a new immutable `REVISION`; retain the previous release.
 2. Repeat port ownership checks; the current instance service is the only acceptable bridge owner.
-3. Stage `/opt/talktohermes/releases/NEW_REVISION`, install its pinned dependencies, and validate the CLI with a non-listening unit test—do not manually launch a second server.
-4. Atomically repoint `current`, then explicitly restart (an already active unit will not pick up a new symlink otherwise):
+3. Before upgrading to the `assistant_name` status contract, back up each private instance YAML, add the bridge's explicit printable, unpadded 1–64-character `assistant_name`, and add a reviewed `exposed_tools` mapping. The mapping defaults to empty, so omitting it is safe but intentionally hides all tool activity from the app. The bridge contains a transition fallback only for legacy instances whose exact `instance_id` is `klaus` or `johanna`; every other instance must set the name explicitly. Keep the complete prior YAML with the prior release for rollback.
+4. Deploy and verify the backend before distributing the matching iOS app. The new app can read the two known legacy IDs during transition, while the upgraded backend always returns the explicit validated name. Verify `/v1/status` for each instance before app rollout.
+5. Stage `/opt/talktohermes/releases/NEW_REVISION`, install its pinned dependencies, and validate the CLI with a non-listening unit test—do not manually launch a second server.
+6. Atomically repoint `current`, then explicitly restart (an already active unit will not pick up a new symlink otherwise):
 
    ```sh
    ln -sfn /opt/talktohermes/releases/NEW_REVISION /opt/talktohermes/current
@@ -315,15 +319,16 @@ Finally run one representative create/voice/status/audio flow through HTTPS. Con
    systemctl is-active talktohermes@INSTANCE.service
    ```
 
-5. Repeat health, auth, HTTPS, representative voice flow, Telegram preservation, and cross-token checks. Upgrade the custom Caddy image only when required, with separately reviewed pins and container validation.
+7. Repeat health, auth, HTTPS, representative voice flow, Telegram preservation, and cross-token checks. Upgrade the custom Caddy image only when required, with separately reviewed pins and container validation.
 
 ## Rollback
 
-Do not delete the failed release or database before diagnosis. Capture bounded logs, point `current` to the known-good release, and restart:
+Do not delete the failed release or database before diagnosis. Capture bounded logs, stop the service, restore the complete private YAML saved with the previous release, then point `current` to that release and restart. Restoring the YAML first is required when the newer release introduced strict configuration keys that the older release rejects:
 
 ```sh
 journalctl -u talktohermes@INSTANCE.service -n 200 --no-pager
 systemctl stop talktohermes@INSTANCE.service
+install -o root -g root -m 0644 /path/to/PREVIOUS_INSTANCE.yaml /etc/talktohermes/INSTANCE.yaml
 ln -sfn /opt/talktohermes/releases/PREVIOUS_REVISION /opt/talktohermes/current
 systemctl daemon-reload
 systemctl restart talktohermes@INSTANCE.service

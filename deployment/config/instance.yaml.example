@@ -1,10 +1,17 @@
 instance_id: INSTANCE
+assistant_name: ASSISTANT_NAME
 profile: default
 development: false
 listen_host: 127.0.0.1
 listen_port: 18081
 state_dir: /var/lib/talktohermes/INSTANCE
 secret_file: /etc/talktohermes/INSTANCE.secrets
+
+# Only mapped tool identifiers are exposed to the app. Values are safe,
+# alphanumeric display identifiers; omit any tool that should stay private.
+exposed_tools:
+  OpenCodeTool: OpenCodeTool
+  functions.browser_exec: BrowserTool
 
 hermes:
   base_url: http://127.0.0.1:8642

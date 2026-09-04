@@ -20,6 +20,7 @@ from .auth import require_app_token
 from .hermes_client import HermesClient
 from .models import (
     ApprovalRequest,
+    CancelResponse,
     ConversationResponse,
     StatusResponse,
     TextTurnRequest,
@@ -167,7 +168,12 @@ def create_app(
     app.state.retention.cleanup_restart_artifacts()
     app.state.retention.cleanup()
     app.state.turn_service = TurnService(
-        app.state.storage, app.state.hermes, stt=stt, tts=tts, audio_root=app.state.audio_root
+        app.state.storage,
+        app.state.hermes,
+        stt=stt,
+        tts=tts,
+        audio_root=app.state.audio_root,
+        exposed_tools=settings.exposed_tools,
     )
 
     def finish_task(task: asyncio.Task[Any], *, cleanup_audio: bool = False) -> None:
@@ -204,7 +210,11 @@ def create_app(
         response_model=StatusResponse,
     )
     async def bridge_status() -> dict[str, str]:
-        return {"status": "ready", "instance_id": settings.instance_id}
+        return {
+            "status": "ready",
+            "instance_id": settings.instance_id,
+            "assistant_name": settings.assistant_name,
+        }
 
     @app.post(
         "/v1/conversations",
@@ -362,7 +372,10 @@ def create_app(
         response_model_exclude_none=True,
     )
     async def get_turn(turn_id: str) -> dict[str, Any]:
-        return require_turn(turn_id).public_dict()
+        turn = require_turn(turn_id)
+        result = turn.public_dict()
+        result["tools"] = app.state.storage.list_tool_names(turn_id)
+        return result
 
     @app.get(
         "/v1/turns/{turn_id}/events",
@@ -482,6 +495,7 @@ def create_app(
     @app.post(
         "/v1/turns/{turn_id}/cancel",
         dependencies=[Depends(require_app_token)],
+        response_model=CancelResponse,
         status_code=status.HTTP_202_ACCEPTED,
     )
     async def cancel_turn(turn_id: str) -> dict[str, str]:

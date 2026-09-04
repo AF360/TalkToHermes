@@ -8,7 +8,14 @@ import pytest
 from talktohermes.settings import SettingsError, load_settings
 
 
-def write_instance(tmp_path: Path, *, instance_id: str = "instance-a", port: int = 0, host: str = "127.0.0.1") -> Path:
+def write_instance(
+    tmp_path: Path,
+    *,
+    instance_id: str = "instance-a",
+    assistant_name: str = "Klaus",
+    port: int = 0,
+    host: str = "127.0.0.1",
+) -> Path:
     state = tmp_path / instance_id
     state.mkdir(mode=0o700)
     worker = tmp_path / f"{instance_id}-worker"
@@ -46,12 +53,16 @@ def write_instance(tmp_path: Path, *, instance_id: str = "instance-a", port: int
     config = tmp_path / f"{instance_id}.yaml"
     config.write_text(
         f"""instance_id: {instance_id}
+assistant_name: {assistant_name}
 profile: default
 development: true
 listen_host: {host}
 listen_port: {port}
 state_dir: {state}
 secret_file: {secret}
+exposed_tools:
+  OpenCodeTool: OpenCodeTool
+  functions.browser_exec: BrowserTool
 hermes:
   base_url: http://127.0.0.1:8642
 stt:
@@ -81,9 +92,70 @@ voice_worker:
     return config
 
 
+def test_migrates_known_legacy_instance_name_without_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path, instance_id="klaus")
+    config.write_text(
+        config.read_text(encoding="utf-8").replace("assistant_name: Klaus\n", ""),
+        encoding="utf-8",
+    )
+
+    assert load_settings(config).assistant_name == "Klaus"
+
+
+def test_loads_configured_assistant_name(tmp_path: Path) -> None:
+    settings = load_settings(write_instance(tmp_path, assistant_name="T’Pol"))
+
+    assert settings.assistant_name == "T’Pol"
+
+
+def test_rejects_empty_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "assistant_name: Klaus", 'assistant_name: ""'
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+def test_rejects_overlong_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path, assistant_name="A" * 65)
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+def test_rejects_nonprinting_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path, assistant_name="\u200b")
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+def test_rejects_padded_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "assistant_name: Klaus", 'assistant_name: " Klaus "'
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
 def test_loads_valid_isolated_instance(tmp_path: Path) -> None:
     settings = load_settings(write_instance(tmp_path))
     assert settings.instance_id == "instance-a"
+    assert settings.assistant_name == "Klaus"
+    assert settings.exposed_tools == {
+        "OpenCodeTool": "OpenCodeTool",
+        "functions.browser_exec": "BrowserTool",
+    }
     assert settings.listen_port == 0
     assert settings.app_token.get_secret_value() == "a" * 48
     assert settings.hermes.api_key.get_secret_value() == "h" * 48

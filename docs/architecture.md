@@ -72,7 +72,9 @@ The verified approval-capable turn path composes two official APIs. Before each 
 
 Each run also receives a bounded, operator-configurable `hermes.voice_instructions` overlay. It preserves the configured Hermes profile, identity, memory, tools and safety prompt while shaping output for spoken delivery. The authenticated client selects only the allowlisted per-turn response style `short`, `normal` or `detailed`; the bridge maps that enum to fixed instructions and fingerprints it as part of idempotency. No request can supply arbitrary system-prompt text.
 
-The authenticated status response exposes the configured bridge `instance_id`. The native client derives its assistant display name from that value, so switching endpoints also switches the visible identity without client-side persona configuration. Spoken-conversation instructions remain operator-configurable per bridge and are never supplied by the client.
+The authenticated status response exposes the configured bridge `instance_id` and the explicit server-controlled `assistant_name` (a printable, unpadded display name of 1–64 Unicode characters). The native client treats endpoint plus `instance_id` plus `assistant_name` as the bridge identity and resets local conversation state when any of them changes. It displays the supplied assistant name instead of deriving a persona from an identifier. Spoken-conversation instructions remain operator-configurable per bridge and are never supplied by the client.
+
+Tool activity is fail-closed metadata. The bridge exposes only internal tool IDs present in the per-instance `exposed_tools` mapping, translates them to constrained alphanumeric display identifiers, deduplicates them, and never forwards tool arguments, previews, results, paths, or prompts. An unmapped tool produces no client-visible metadata.
 
 ## Hermes Voice Worker
 

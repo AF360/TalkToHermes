@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import io
 import os
+import time
 import wave
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -145,6 +146,39 @@ def test_authenticated_voice_turn_runs_stt_hermes_tts_and_downloads_audio(tmp_pa
     assert audio.content[:4] == b"RIFF"
     assert storage.get_turn(turn_id).input_text == "Spoken question"
     assert storage.get_turn(turn_id).response_style == "detailed"
+
+
+def test_completed_turn_exposes_transcript_and_safe_unique_tool_names(tmp_path: Path) -> None:
+    api, token, _, hermes, _, _ = client(tmp_path)
+
+    async def events(run_id: str) -> AsyncIterator[dict]:
+        yield {"event": "tool.started", "tool": "OpenCodeTool", "preview": "/private/path"}
+        yield {"event": "tool.started", "tool": "credential:opaque"}
+        yield {"event": "tool.started", "tool": "functions.browser_exec"}
+        yield {"event": "run.completed", "output": "Die Antwort"}
+
+    hermes.events = events  # type: ignore[method-assign]
+    conversation_id = api.post("/v1/conversations", headers=auth(token)).json()["conversation_id"]
+    submitted = api.post(
+        f"/v1/conversations/{conversation_id}/turns",
+        headers=auth(token),
+        files={"audio": ("question.wav", wav_bytes(), "audio/wav")},
+        data={"client_turn_id": "b2de28e1-8f40-4ae0-9350-c693e99bcfea"},
+    )
+
+    turn_id = submitted.json()["turn_id"]
+    turn: dict = {}
+    for _ in range(100):
+        turn = api.get(f"/v1/turns/{turn_id}", headers=auth(token)).json()
+        if turn["state"] in {"completed", "failed", "cancelled"}:
+            break
+        time.sleep(0.01)
+
+    assert turn["state"] == "completed"
+    assert turn["input_text"] == "Spoken question"
+    assert turn["tools"] == ["OpenCodeTool", "BrowserTool"]
+    assert "/private/path" not in str(turn)
+    assert "credential:opaque" not in str(turn)
 
 
 def test_voice_turn_rejects_unknown_response_style(tmp_path: Path) -> None:
