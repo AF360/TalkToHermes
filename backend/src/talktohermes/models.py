@@ -9,7 +9,9 @@ class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-ExposedToolName = Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9]{0,63}$")]
+ExposedToolName = Annotated[
+    str, Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]{0,127}$")
+]
 
 
 class ConversationResponse(StrictModel):

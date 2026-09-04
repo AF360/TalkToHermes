@@ -102,17 +102,18 @@ final class TalkToHermesUITests: XCTestCase {
         firstCall.tap()
 
         XCTAssertTrue(
-            app.staticTexts["OpenCode Tool"].waitForExistence(timeout: 3),
+            app.staticTexts["Read File"].waitForExistence(timeout: 3),
             app.debugDescription
         )
         XCTAssertTrue(app.staticTexts["Tool-Aufruf 1"].exists)
-        XCTAssertTrue(app.staticTexts["Projekt öffnen"].exists)
+        XCTAssertTrue(app.staticTexts["Datei gelesen"].exists)
         XCTAssertTrue(app.staticTexts["Aufgerufen"].exists)
         XCTAssertTrue(app.staticTexts["Nicht erforderlich"].exists)
     }
 
     @MainActor
     func testOpensSecureConnectionSettings() throws {
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
@@ -124,9 +125,15 @@ final class TalkToHermesUITests: XCTestCase {
         XCTAssertTrue(app.textFields["ServerHostField"].exists)
         XCTAssertTrue(app.textFields["Port"].exists)
         XCTAssertEqual(app.textFields["Port"].value as? String, "8443")
-        app.swipeUp()
+        let form = app.collectionViews.firstMatch
+        XCTAssertTrue(form.exists, app.debugDescription)
+        let responseStylePicker = app.descendants(matching: .any)["ResponseStylePicker"]
+        for _ in 0..<3 where !responseStylePicker.exists {
+            form.swipeUp()
+        }
         XCTAssertTrue(
-            app.descendants(matching: .any)["ResponseStylePicker"].waitForExistence(timeout: 3)
+            responseStylePicker.waitForExistence(timeout: 3),
+            app.debugDescription
         )
         XCTAssertTrue(
             app.descendants(matching: .any)["SpeechLanguagePicker"].waitForExistence(timeout: 3)

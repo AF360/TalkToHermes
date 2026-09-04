@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: TalkToHermes Voice Bridge
-  version: 1.0.2
+  version: 1.0.3
 servers:
   - url: https://hermes-agent.home.arpa:{port}
     variables:
@@ -253,7 +253,7 @@ components:
       required: [id, name, started_at]
       properties:
         id: {type: string, pattern: '^tool-[1-9][0-9]*$'}
-        name: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,63}$'}
+        name: {type: string, pattern: '^[A-Za-z][A-Za-z0-9_.-]{0,127}$'}
         summary:
           anyOf:
             - {type: string, minLength: 1, maxLength: 160}
@@ -280,7 +280,7 @@ components:
         input_text: {anyOf: [{type: string}, {type: "null"}]}
         tools:
           type: array
-          items: {type: string, pattern: '^[A-Za-z][A-Za-z0-9]{0,63}$'}
+          items: {type: string, pattern: '^[A-Za-z][A-Za-z0-9_.-]{0,127}$'}
         tool_invocations:
           type: array
           maxItems: 256

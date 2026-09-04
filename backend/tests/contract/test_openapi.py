@@ -69,7 +69,10 @@ def test_turn_response_documents_chat_transcript_and_tool_invocations() -> None:
     }
     assert properties["tools"] == {
         "type": "array",
-        "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{0,63}$"},
+        "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,127}$",
+        },
     }
     assert properties["tool_invocations"] == {
         "type": "array",

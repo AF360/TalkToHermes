@@ -103,14 +103,14 @@ def test_tool_names_query_is_ordered_unique_and_safe(tmp_path: Path) -> None:
     conversation = db.create_conversation("hs-1")
     turn, _ = db.create_or_get_text_turn(conversation.id, "client-1", "Hallo")
     db.append_event(turn.id, "hermes.delta", {"delta": "/private/path"})
-    db.append_event(turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"})
-    db.append_event(turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"})
-    db.append_event(turn.id, "hermes.tool_started", {"tool": "BrowserTool"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": "read_file"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": "read_file"})
+    db.append_event(turn.id, "hermes.tool_started", {"tool": "browser_exec"})
     db.append_event(turn.id, "hermes.tool_started", {"tool": "token:sk_live_private"})
     db.append_event(turn.id, "hermes.tool_started", {"tool": "invalid tool"})
     db.append_event(turn.id, "hermes.tool_started", {"tool": 42})
 
-    assert db.list_tool_names(turn.id) == ["OpenCodeTool", "BrowserTool"]
+    assert db.list_tool_names(turn.id) == ["read_file", "browser_exec"]
 
 
 def test_tool_invocations_preserve_each_call_and_safe_lifecycle_metadata(tmp_path: Path) -> None:
@@ -121,7 +121,7 @@ def test_tool_invocations_preserve_each_call_and_safe_lifecycle_metadata(tmp_pat
     db.append_event(
         turn.id,
         "hermes.approval_required",
-        {"tool": "OpenCodeTool", "risk": "high", "choices": ["once", "deny"]},
+        {"tool": "read_file", "risk": "high", "choices": ["once", "deny"]},
     )
     db.append_event(
         turn.id,
@@ -131,18 +131,18 @@ def test_tool_invocations_preserve_each_call_and_safe_lifecycle_metadata(tmp_pat
     first = db.append_event(
         turn.id,
         "hermes.tool_started",
-        {"tool": "OpenCodeTool", "summary": "Projekt öffnen"},
+        {"tool": "read_file", "summary": "Projekt öffnen"},
     )
     second = db.append_event(
         turn.id,
         "hermes.tool_started",
-        {"tool": "OpenCodeTool", "summary": "Tests ausführen"},
+        {"tool": "read_file", "summary": "Tests ausführen"},
     )
 
     assert db.list_tool_invocations(turn.id) == [
         {
             "id": f"tool-{first.sequence}",
-            "name": "OpenCodeTool",
+            "name": "read_file",
             "status": "invoked",
             "started_at": first.created_at,
             "approval_required": True,
@@ -150,7 +150,7 @@ def test_tool_invocations_preserve_each_call_and_safe_lifecycle_metadata(tmp_pat
         },
         {
             "id": f"tool-{second.sequence}",
-            "name": "OpenCodeTool",
+            "name": "read_file",
             "status": "invoked",
             "started_at": second.created_at,
             "approval_required": False,
@@ -164,25 +164,25 @@ def test_denied_or_unresolved_approval_is_not_attached_to_later_call(tmp_path: P
 
     denied, _ = db.create_or_get_text_turn(conversation.id, "denied", "Hallo")
     db.append_event(
-        denied.id, "hermes.approval_required", {"tool": "BrowserTool", "risk": "medium"}
+        denied.id, "hermes.approval_required", {"tool": "browser_exec", "risk": "medium"}
     )
     db.append_event(denied.id, "hermes.approval_resolved", {"decision": "deny"})
     denied_start = db.append_event(
-        denied.id, "hermes.tool_started", {"tool": "BrowserTool"}
+        denied.id, "hermes.tool_started", {"tool": "browser_exec"}
     )
 
     unresolved, _ = db.create_or_get_text_turn(conversation.id, "unresolved", "Hallo")
     db.append_event(
-        unresolved.id, "hermes.approval_required", {"tool": "BrowserTool", "risk": "high"}
+        unresolved.id, "hermes.approval_required", {"tool": "browser_exec", "risk": "high"}
     )
     unresolved_start = db.append_event(
-        unresolved.id, "hermes.tool_started", {"tool": "BrowserTool"}
+        unresolved.id, "hermes.tool_started", {"tool": "browser_exec"}
     )
 
     assert db.list_tool_invocations(denied.id) == [
         {
             "id": f"tool-{denied_start.sequence}",
-            "name": "BrowserTool",
+            "name": "browser_exec",
             "status": "invoked",
             "started_at": denied_start.created_at,
             "approval_required": False,
@@ -191,7 +191,7 @@ def test_denied_or_unresolved_approval_is_not_attached_to_later_call(tmp_path: P
     assert db.list_tool_invocations(unresolved.id) == [
         {
             "id": f"tool-{unresolved_start.sequence}",
-            "name": "BrowserTool",
+            "name": "browser_exec",
             "status": "invoked",
             "started_at": unresolved_start.created_at,
             "approval_required": False,
@@ -204,23 +204,23 @@ def test_approved_metadata_expires_on_next_nonmatching_tool_start(tmp_path: Path
     conversation = db.create_conversation("hs-stale-approval")
     turn, _ = db.create_or_get_text_turn(conversation.id, "stale", "Hallo")
     db.append_event(
-        turn.id, "hermes.approval_required", {"tool": "OpenCodeTool", "risk": "high"}
+        turn.id, "hermes.approval_required", {"tool": "read_file", "risk": "high"}
     )
     db.append_event(turn.id, "hermes.approval_resolved", {"decision": "once"})
-    beta = db.append_event(turn.id, "hermes.tool_started", {"tool": "BrowserTool"})
-    alpha = db.append_event(turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"})
+    beta = db.append_event(turn.id, "hermes.tool_started", {"tool": "browser_exec"})
+    alpha = db.append_event(turn.id, "hermes.tool_started", {"tool": "read_file"})
 
     assert db.list_tool_invocations(turn.id) == [
         {
             "id": f"tool-{beta.sequence}",
-            "name": "BrowserTool",
+            "name": "browser_exec",
             "status": "invoked",
             "started_at": beta.created_at,
             "approval_required": False,
         },
         {
             "id": f"tool-{alpha.sequence}",
-            "name": "OpenCodeTool",
+            "name": "read_file",
             "status": "invoked",
             "started_at": alpha.created_at,
             "approval_required": False,
@@ -233,19 +233,19 @@ def test_unmapped_approval_request_clears_previous_correlation(tmp_path: Path) -
     conversation = db.create_conversation("hs-unmapped-approval")
     turn, _ = db.create_or_get_text_turn(conversation.id, "unmapped", "Hallo")
     db.append_event(
-        turn.id, "hermes.approval_required", {"tool": "OpenCodeTool", "risk": "high"}
+        turn.id, "hermes.approval_required", {"tool": "read_file", "risk": "high"}
     )
     db.append_event(turn.id, "hermes.approval_resolved", {"decision": "once"})
     db.append_event(turn.id, "hermes.approval_required", {"risk": "medium"})
     db.append_event(turn.id, "hermes.approval_resolved", {"decision": "once"})
     started = db.append_event(
-        turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"}
+        turn.id, "hermes.tool_started", {"tool": "read_file"}
     )
 
     assert db.list_tool_invocations(turn.id) == [
         {
             "id": f"tool-{started.sequence}",
-            "name": "OpenCodeTool",
+            "name": "read_file",
             "status": "invoked",
             "started_at": started.created_at,
             "approval_required": False,
@@ -258,18 +258,18 @@ def test_invalid_tool_start_clears_previous_approval_correlation(tmp_path: Path)
     conversation = db.create_conversation("hs-invalid-start")
     turn, _ = db.create_or_get_text_turn(conversation.id, "invalid-start", "Hallo")
     db.append_event(
-        turn.id, "hermes.approval_required", {"tool": "OpenCodeTool", "risk": "high"}
+        turn.id, "hermes.approval_required", {"tool": "read_file", "risk": "high"}
     )
     db.append_event(turn.id, "hermes.approval_resolved", {"decision": "once"})
     db.append_event(turn.id, "hermes.tool_started", {})
     started = db.append_event(
-        turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"}
+        turn.id, "hermes.tool_started", {"tool": "read_file"}
     )
 
     assert db.list_tool_invocations(turn.id) == [
         {
             "id": f"tool-{started.sequence}",
-            "name": "OpenCodeTool",
+            "name": "read_file",
             "status": "invoked",
             "started_at": started.created_at,
             "approval_required": False,

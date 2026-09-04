@@ -12,7 +12,7 @@ from typing import Any, Callable, TypeVar
 
 from .response_style import RESPONSE_STYLES
 
-TOOL_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9]{0,63}")
+TOOL_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,127}")
 MAX_TOOL_INVOCATIONS = 256
 MAX_TOOL_LIFECYCLE_EVENTS = 1_024
 MAX_EVENT_PAGE = 256

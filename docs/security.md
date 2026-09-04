@@ -76,7 +76,7 @@ Forbidden:
 
 - credentials or authorization headers;
 - raw audio, clone references, transcripts by default;
-- raw tool previews, arguments, payloads, results, prompts, or unmapped internal tool IDs;
+- raw tool previews, arguments, payloads, results, prompts, or malformed tool IDs;
 - filesystem paths returned to clients;
 - unredacted model/provider exceptions.
 

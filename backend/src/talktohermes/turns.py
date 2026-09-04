@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from .storage import Storage, TransitionError
+from .storage import Storage, TOOL_NAME_RE, TransitionError
 
 TERMINAL_STATES = frozenset({"completed", "failed", "cancelled"})
 
@@ -42,7 +42,6 @@ class TurnService:
         stt: Any | None = None,
         tts: Any | None = None,
         audio_root: Any | None = None,
-        exposed_tools: dict[str, str] | None = None,
         approval_timeout_seconds: float = 120,
         quiescence_timeout_seconds: float = 1,
     ) -> None:
@@ -53,7 +52,6 @@ class TurnService:
         self.stt = stt
         self.tts = tts
         self.audio_root = audio_root
-        self.exposed_tools = dict(exposed_tools or {})
         self.approval_timeout_seconds = approval_timeout_seconds
         self.quiescence_timeout_seconds = quiescence_timeout_seconds
         self._active_tasks: dict[str, tuple[asyncio.Task[Any], bool]] = {}
@@ -214,10 +212,9 @@ class TurnService:
                             self.storage.append_event(turn_id, "hermes.delta", {"delta": delta})
                 elif event_name == "tool.started":
                     tool = event.get("tool")
-                    exposed_tool = self.exposed_tools.get(tool) if isinstance(tool, str) else None
-                    if exposed_tool is not None:
+                    if isinstance(tool, str) and TOOL_NAME_RE.fullmatch(tool) is not None:
                         self.storage.append_event(
-                            turn_id, "hermes.tool_started", {"tool": exposed_tool}
+                            turn_id, "hermes.tool_started", {"tool": tool}
                         )
                 elif event_name == "approval.request":
                     expires_at = self._parse_expiry(event.get("expires_at"))
@@ -228,9 +225,8 @@ class TurnService:
                     self.storage.await_approval(turn_id, expires_at.isoformat())
                     safe: dict[str, Any] = {}
                     tool = event.get("tool")
-                    exposed_tool = self.exposed_tools.get(tool) if isinstance(tool, str) else None
-                    if exposed_tool is not None:
-                        safe["tool"] = exposed_tool
+                    if isinstance(tool, str) and TOOL_NAME_RE.fullmatch(tool) is not None:
+                        safe["tool"] = tool
                     risk = event.get("risk")
                     if isinstance(risk, str) and risk.lower() in {"low", "medium", "high"}:
                         safe["risk"] = risk.lower()

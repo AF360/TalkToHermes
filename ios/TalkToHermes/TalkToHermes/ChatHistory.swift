@@ -107,10 +107,37 @@ nonisolated enum ChatToolName {
     static func display(_ identifier: String) -> String {
         let trimmed = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return identifier }
+
+        let mcpParts = trimmed.components(separatedBy: "__")
+        if mcpParts.count > 1 {
+            let visibleParts = mcpParts.first?.lowercased() == "mcp"
+                ? Array(mcpParts.dropFirst())
+                : mcpParts
+            return visibleParts.map(titleize).joined(separator: " · ")
+        }
+
+        let namespaceParts = trimmed.components(separatedBy: ".")
+        if namespaceParts.count > 1 {
+            return namespaceParts.map(titleize).joined(separator: " · ")
+        }
+
         if trimmed.hasSuffix("Tool"), trimmed.count > 4 {
             return String(trimmed.dropLast(4)) + " Tool"
         }
-        return trimmed.prefix(1).uppercased() + trimmed.dropFirst()
+        return titleize(trimmed)
+    }
+
+    private static func titleize(_ value: String) -> String {
+        value
+            .split(whereSeparator: { $0 == "_" || $0 == "-" })
+            .map { word in
+                let text = String(word)
+                if ["api", "ha", "mcp", "stt", "tts"].contains(text.lowercased()) {
+                    return text.uppercased()
+                }
+                return text.prefix(1).uppercased() + text.dropFirst()
+            }
+            .joined(separator: " ")
     }
 }
 

@@ -28,7 +28,7 @@ from .models import (
     TurnResponse,
 )
 from .settings import Settings
-from .storage import NotFoundError, Storage, TransitionError
+from .storage import NotFoundError, Storage, TOOL_NAME_RE, TransitionError
 from .stt.base import STTValidationError, validate_language
 from .retention import RetentionManager
 from .response_style import RESPONSE_STYLES
@@ -103,7 +103,7 @@ def create_app(
                 raise first_close_error
 
     app = FastAPI(
-        title="TalkToHermes Voice Bridge", version="1.0.2", lifespan=lifespan
+        title="TalkToHermes Voice Bridge", version="1.0.3", lifespan=lifespan
     )
 
     class RequestBodyTooLarge(Exception):
@@ -173,7 +173,6 @@ def create_app(
         stt=stt,
         tts=tts,
         audio_root=app.state.audio_root,
-        exposed_tools=settings.exposed_tools,
     )
 
     def finish_task(task: asyncio.Task[Any], *, cleanup_audio: bool = False) -> None:
@@ -374,17 +373,8 @@ def create_app(
     async def get_turn(turn_id: str) -> dict[str, Any]:
         turn = require_turn(turn_id)
         result = turn.public_dict()
-        exposed_tool_names = set(settings.exposed_tools.values())
-        result["tools"] = [
-            name
-            for name in app.state.storage.list_tool_names(turn_id)
-            if name in exposed_tool_names
-        ]
-        result["tool_invocations"] = [
-            invocation
-            for invocation in app.state.storage.list_tool_invocations(turn_id)
-            if invocation["name"] in exposed_tool_names
-        ]
+        result["tools"] = app.state.storage.list_tool_names(turn_id)
+        result["tool_invocations"] = app.state.storage.list_tool_invocations(turn_id)
         for invocation in result["tool_invocations"]:
             summary = settings.tool_summaries.get(invocation["name"])
             if summary is not None:
@@ -407,8 +397,6 @@ def create_app(
         latest_sequence = app.state.storage.latest_event_sequence(turn_id)
         if replay_after < 0 or replay_after > latest_sequence:
             raise HTTPException(status_code=422, detail="Invalid Last-Event-ID")
-        exposed_tool_names = set(settings.exposed_tools.values())
-
         async def stream():
             sequence = replay_after
             while True:
@@ -417,7 +405,7 @@ def create_app(
                     event_payload = event.payload
                     if event.event_type == "hermes.tool_started":
                         tool = event.payload.get("tool")
-                        if not isinstance(tool, str) or tool not in exposed_tool_names:
+                        if not isinstance(tool, str) or TOOL_NAME_RE.fullmatch(tool) is None:
                             sequence = event.sequence
                             continue
                         event_payload = {"tool": tool}

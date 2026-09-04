@@ -33,8 +33,7 @@ SECRET_KEYS = frozenset(
 INSTANCE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 INSTANCE_MARKER = ".talktohermes-instance"
 MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
-INTERNAL_TOOL_ID_RE = re.compile(r"^[A-Za-z0-9_.:-]{1,64}$")
-EXPOSED_TOOL_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9]{0,63}$")
+INTERNAL_TOOL_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,127}$")
 PIPER_VOICE_RE = re.compile(
     r"^[a-z]{2,3}_[A-Z]{2,3}-[a-z0-9_]+-(?:x_)?(?:low|medium|high)$"
 )
@@ -148,7 +147,6 @@ class Settings(BaseModel):
     state_dir: Path
     secret_file: Path
     app_token: SecretStr
-    exposed_tools: dict[str, str] = Field(default_factory=dict)
     tool_summaries: dict[str, str] = Field(default_factory=dict)
     hermes: HermesSettings
     stt: tuple[STTProviderSettings, ...] = Field(min_length=1, max_length=3)
@@ -167,29 +165,12 @@ class Settings(BaseModel):
             raise ValueError("invalid assistant name")
         return value
 
-    @field_validator("exposed_tools")
-    @classmethod
-    def validate_exposed_tools(cls, value: dict[str, str]) -> dict[str, str]:
-        if (
-            len(value) > 64
-            or len(set(value.values())) != len(value)
-            or any(
-                INTERNAL_TOOL_ID_RE.fullmatch(tool_id) is None
-                or EXPOSED_TOOL_NAME_RE.fullmatch(display_name) is None
-                for tool_id, display_name in value.items()
-            )
-        ):
-            raise ValueError("invalid exposed tool mapping")
-        return value
-
     @model_validator(mode="after")
     def validate_tool_summaries(self) -> Settings:
-        exposed_names = set(self.exposed_tools.values())
         if (
             len(self.tool_summaries) > 64
-            or not set(self.tool_summaries).issubset(exposed_names)
             or any(
-                EXPOSED_TOOL_NAME_RE.fullmatch(tool_name) is None
+                INTERNAL_TOOL_ID_RE.fullmatch(tool_name) is None
                 or not 1 <= len(summary) <= 160
                 or summary != summary.strip()
                 or not summary.isprintable()
@@ -369,6 +350,7 @@ def load_settings(path: Path | str) -> Settings:
         raise SettingsError("app, Hermes, and voice secrets must be different")
 
     merged = dict(payload)
+    merged.pop("exposed_tools", None)
     if "assistant_name" not in merged:
         legacy_assistant_names = {"klaus": "Klaus", "johanna": "Johanna"}
         legacy_instance_id = merged.get("instance_id")

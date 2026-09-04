@@ -313,8 +313,8 @@ private struct ChatTimelinePreviewContent: View {
     private let toolInvocations = [
         ChatToolInvocation(
             id: "tool-6",
-            name: "OpenCodeTool",
-            summary: "Projekt öffnen",
+            name: "read_file",
+            summary: "Datei gelesen",
             status: "invoked",
             startedAt: "2026-09-04T17:00:00Z",
             approvalRequired: false,
@@ -322,8 +322,8 @@ private struct ChatTimelinePreviewContent: View {
         ),
         ChatToolInvocation(
             id: "tool-7",
-            name: "BrowserTool",
-            summary: "Wetter für Bochum suchen",
+            name: "mcp__home_assistant__ha_get_state",
+            summary: "Status in Home Assistant abgerufen",
             status: "invoked",
             startedAt: "2026-09-04T17:00:01Z",
             approvalRequired: true,
@@ -346,10 +346,10 @@ private struct ChatTimelinePreviewContent: View {
                         ),
                         ChatExchange(
                             id: "preview-2",
-                            userText: "Und jetzt Super Asteroids.",
-                            assistantText: "Der Wechsel ist etwas sprunghaft, aber Super Asteroids ist gestartet.",
+                            userText: "Wie ist morgen das Wetter in Bochum?",
+                            assistantText: "Ich habe die Wetterinformationen abgerufen.",
                             assistantName: "Johanna",
-                            tools: ["SuperAsteroidsTool"]
+                            tools: ["web_search"]
                         )
                     ],
                     hasPlayableResponse: true,
@@ -375,8 +375,8 @@ private struct ChatTimelinePreviewContent: View {
     ToolInvocationPopover(
         invocation: ChatToolInvocation(
             id: "tool-7",
-            name: "BrowserTool",
-            summary: "Wetter für Bochum suchen",
+            name: "mcp__home_assistant__ha_get_state",
+            summary: "Status in Home Assistant abgerufen",
             status: "invoked",
             startedAt: "2026-09-04T17:00:01Z",
             approvalRequired: true,

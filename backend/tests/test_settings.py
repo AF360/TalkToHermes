@@ -61,10 +61,9 @@ listen_port: {port}
 state_dir: {state}
 secret_file: {secret}
 exposed_tools:
-  OpenCodeTool: OpenCodeTool
-  functions.browser_exec: BrowserTool
+  functions.browser_exec: terminal
 tool_summaries:
-  BrowserTool: Webinhalt abgerufen
+  functions.browser_exec: Browseraktion ausgeführt
 hermes:
   base_url: http://127.0.0.1:8642
 stt:
@@ -150,26 +149,12 @@ def test_rejects_padded_assistant_name(tmp_path: Path) -> None:
         load_settings(config)
 
 
-def test_rejects_duplicate_exposed_tool_display_names(tmp_path: Path) -> None:
+def test_rejects_invalid_tool_summary_identifier(tmp_path: Path) -> None:
     config = write_instance(tmp_path)
     config.write_text(
         config.read_text().replace(
-            "functions.browser_exec: BrowserTool",
-            "functions.browser_exec: OpenCodeTool",
-        ),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(SettingsError, match="invalid instance configuration"):
-        load_settings(config)
-
-
-def test_rejects_tool_summary_without_exposed_display_name(tmp_path: Path) -> None:
-    config = write_instance(tmp_path)
-    config.write_text(
-        config.read_text().replace(
-            "  BrowserTool: Webinhalt abgerufen",
-            "  UnknownTool: Verborgene Aktion",
+            "  functions.browser_exec: Browseraktion ausgeführt",
+            '  "invalid tool": Verborgene Aktion',
         ),
         encoding="utf-8",
     )
@@ -183,8 +168,8 @@ def test_rejects_invalid_static_tool_summary(tmp_path: Path, summary: str) -> No
     config = write_instance(tmp_path)
     config.write_text(
         config.read_text().replace(
-            "  BrowserTool: Webinhalt abgerufen",
-            f'  BrowserTool: "{summary}"',
+            "  functions.browser_exec: Browseraktion ausgeführt",
+            f'  functions.browser_exec: "{summary}"',
         ),
         encoding="utf-8",
     )
@@ -197,11 +182,11 @@ def test_loads_valid_isolated_instance(tmp_path: Path) -> None:
     settings = load_settings(write_instance(tmp_path))
     assert settings.instance_id == "instance-a"
     assert settings.assistant_name == "Klaus"
-    assert settings.exposed_tools == {
-        "OpenCodeTool": "OpenCodeTool",
-        "functions.browser_exec": "BrowserTool",
+    assert "tool_display_names" not in settings.model_dump()
+    assert "exposed_tools" not in settings.model_dump()
+    assert settings.tool_summaries == {
+        "functions.browser_exec": "Browseraktion ausgeführt"
     }
-    assert settings.tool_summaries == {"BrowserTool": "Webinhalt abgerufen"}
     assert settings.listen_port == 0
     assert settings.app_token.get_secret_value() == "a" * 48
     assert settings.hermes.api_key.get_secret_value() == "h" * 48
@@ -224,6 +209,12 @@ def test_loads_valid_isolated_instance(tmp_path: Path) -> None:
     assert settings.voice_worker.python.parent.name == "bin"
     assert settings.text_retention_hours == 24.0
     assert settings.cleanup_interval_seconds == 900.0
+
+
+def test_legacy_exposed_tools_is_accepted_but_has_no_runtime_setting(tmp_path: Path) -> None:
+    settings = load_settings(write_instance(tmp_path))
+    assert "exposed_tools" not in settings.model_dump()
+    assert "tool_display_names" not in settings.model_dump()
 
 
 def test_text_retention_cannot_exceed_24_hours(tmp_path: Path) -> None:

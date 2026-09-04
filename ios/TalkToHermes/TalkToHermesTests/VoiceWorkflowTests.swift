@@ -4,7 +4,7 @@ import Testing
 
 struct VoiceWorkflowTests {
     private func completedTurn() throws -> TurnResponse {
-        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-08-29T12:00:00Z","updated_at":"2026-08-29T12:01:00Z","response_text":"Erledigt","input_text":"Öffne das Projekt","tools":["OpenCodeTool","SuperAsteroidsTool"],"error_code":null}"#.utf8)
+        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-08-29T12:00:00Z","updated_at":"2026-08-29T12:01:00Z","response_text":"Erledigt","input_text":"Öffne das Projekt","tools":["read_file","web_search"],"error_code":null}"#.utf8)
         return try JSONDecoder().decode(TurnResponse.self, from: data)
     }
 
@@ -43,7 +43,7 @@ struct VoiceWorkflowTests {
                 userText: "Öffne das Projekt",
                 assistantText: "Erledigt",
                 assistantName: "Klaus",
-                tools: ["OpenCodeTool", "SuperAsteroidsTool"]
+                tools: ["read_file", "web_search"]
             )
         ])
     }
@@ -67,14 +67,18 @@ struct VoiceWorkflowTests {
     }
 
     @Test func formatsToolIdentifiersForChatMetadata() {
-        #expect(ChatToolName.display("OpenCodeTool") == "OpenCode Tool")
-        #expect(ChatToolName.display("SuperAsteroidsTool") == "SuperAsteroids Tool")
+        #expect(ChatToolName.display("read_file") == "Read File")
+        #expect(ChatToolName.display("web_search") == "Web Search")
+        #expect(
+            ChatToolName.display("mcp__home_assistant__ha_get_state") ==
+                "Home Assistant · HA Get State"
+        )
         #expect(ChatToolName.display("terminal") == "Terminal")
     }
 
     @Test func preservesDuplicateDetailedToolCallsAndBuildsLegacyMarkers() throws {
-        let detailedData = Data(#"{"turn_id":"turn-detailed","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tool_invocations":[{"id":"tool-6","name":"OpenCodeTool","summary":"Projekt öffnen","status":"invoked","started_at":"2026-09-04T17:00:00Z","approval_required":false},{"id":"tool-7","name":"OpenCodeTool","summary":"Tests starten","status":"invoked","started_at":"2026-09-04T17:00:01Z","approval_required":true,"risk":"medium"}]}"#.utf8)
-        let legacyData = Data(#"{"turn_id":"turn-legacy-tools","conversation_id":"conversation-1","client_turn_id":"client-2","state":"completed","created_at":"2026-09-04T17:01:00Z","updated_at":"2026-09-04T17:01:02Z","response_text":"Alt","tools":["BrowserTool"]}"#.utf8)
+        let detailedData = Data(#"{"turn_id":"turn-detailed","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tool_invocations":[{"id":"tool-6","name":"read_file","summary":"Datei gelesen","status":"invoked","started_at":"2026-09-04T17:00:00Z","approval_required":false},{"id":"tool-7","name":"read_file","summary":"Datei erneut gelesen","status":"invoked","started_at":"2026-09-04T17:00:01Z","approval_required":true,"risk":"medium"}]}"#.utf8)
+        let legacyData = Data(#"{"turn_id":"turn-legacy-tools","conversation_id":"conversation-1","client_turn_id":"client-2","state":"completed","created_at":"2026-09-04T17:01:00Z","updated_at":"2026-09-04T17:01:02Z","response_text":"Alt","tools":["mcp__home_assistant__ha_get_state"]}"#.utf8)
         var history = ChatHistory()
 
         history.append(
@@ -86,15 +90,15 @@ struct VoiceWorkflowTests {
             assistantName: "Klaus"
         )
 
-        #expect(history.exchanges[0].toolInvocations.map(\.name) == ["OpenCodeTool", "OpenCodeTool"])
-        #expect(history.exchanges[0].toolInvocations.map(\.summary) == ["Projekt öffnen", "Tests starten"])
+        #expect(history.exchanges[0].toolInvocations.map(\.name) == ["read_file", "read_file"])
+        #expect(history.exchanges[0].toolInvocations.map(\.summary) == ["Datei gelesen", "Datei erneut gelesen"])
         #expect(history.exchanges[1].toolInvocations == [
-            ChatToolInvocation.legacy(id: "legacy-0", name: "BrowserTool")
+            ChatToolInvocation.legacy(id: "legacy-0", name: "mcp__home_assistant__ha_get_state")
         ])
     }
 
     @Test func toolMarkersUseUniqueTurnScopedIdentifiersAndAccessibleTouchTargets() {
-        let invocation = ChatToolInvocation.legacy(id: "legacy-0", name: "BrowserTool")
+        let invocation = ChatToolInvocation.legacy(id: "legacy-0", name: "mcp__home_assistant__ha_get_state")
 
         #expect(
             invocation.accessibilityIdentifier(exchangeID: "turn-a") ==

@@ -48,24 +48,24 @@ struct APIModelsTests {
     }
 
     @Test func decodesTranscriptAndToolNamesForChatHistory() throws {
-        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-08-29T12:00:00Z","updated_at":"2026-08-29T12:01:00Z","response_text":"Erledigt","input_text":"Öffne das Projekt","tools":["OpenCodeTool","SuperAsteroidsTool"],"error_code":null}"#.utf8)
+        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-08-29T12:00:00Z","updated_at":"2026-08-29T12:01:00Z","response_text":"Erledigt","input_text":"Öffne das Projekt","tools":["read_file","web_search"],"error_code":null}"#.utf8)
 
         let response = try JSONDecoder().decode(TurnResponse.self, from: data)
 
         #expect(response.inputText == "Öffne das Projekt")
-        #expect(response.tools == ["OpenCodeTool", "SuperAsteroidsTool"])
+        #expect(response.tools == ["read_file", "web_search"])
     }
 
     @Test func decodesSafePerCallToolMetadata() throws {
-        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tools":["OpenCodeTool"],"tool_invocations":[{"id":"tool-6","name":"OpenCodeTool","summary":"Projekt öffnen","status":"invoked","started_at":"2026-09-04T17:00:00Z","approval_required":true,"risk":"high"}],"error_code":null}"#.utf8)
+        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tools":["read_file"],"tool_invocations":[{"id":"tool-6","name":"read_file","summary":"Datei gelesen","status":"invoked","started_at":"2026-09-04T17:00:00Z","approval_required":true,"risk":"high"}],"error_code":null}"#.utf8)
 
         let response = try JSONDecoder().decode(TurnResponse.self, from: data)
 
         #expect(response.toolInvocations == [
             ToolInvocation(
                 id: "tool-6",
-                name: "OpenCodeTool",
-                summary: "Projekt öffnen",
+                name: "read_file",
+                summary: "Datei gelesen",
                 status: "invoked",
                 startedAt: "2026-09-04T17:00:00Z",
                 approvalRequired: true,
@@ -75,7 +75,7 @@ struct APIModelsTests {
     }
 
     @Test func toleratesMissingFutureAndMalformedToolDetailsElementwise() throws {
-        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tools":["OpenCodeTool"],"tool_invocations":[{"id":"tool-6","name":"OpenCodeTool","status":"future-status","risk":"future-risk"},{"id":42,"name":"Broken"}]}"#.utf8)
+        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tools":["read_file"],"tool_invocations":[{"id":"tool-6","name":"read_file","status":"future-status","risk":"future-risk"},{"id":42,"name":"Broken"}]}"#.utf8)
 
         let response = try JSONDecoder().decode(TurnResponse.self, from: data)
 

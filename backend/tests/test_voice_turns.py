@@ -154,16 +154,22 @@ def test_completed_turn_exposes_safe_per_call_tool_metadata(tmp_path: Path) -> N
     async def events(run_id: str) -> AsyncIterator[dict]:
         yield {
             "event": "tool.started",
-            "tool": "OpenCodeTool",
+            "tool": "web_search",
             "preview": "Öffne /private/path mit token=abc123",
         }
 
-        yield {"event": "tool.started", "tool": "credential:opaque", "preview": "secret"}
+        yield {"event": "tool.started", "tool": "invalid tool name", "preview": "secret"}
+        yield {
+            "event": "tool.started",
+            "tool": "mcp__home_assistant__ha_get_state",
+            "preview": "entity_id=person.andreas",
+        }
         yield {
             "event": "tool.started",
             "tool": "functions.browser_exec",
             "preview": "Suche Wetter in Bochum",
         }
+        yield {"event": "tool.started", "tool": "terminal", "preview": "secret"}
 
         yield {"event": "run.completed", "output": "Die Antwort"}
 
@@ -193,7 +199,12 @@ def test_completed_turn_exposes_safe_per_call_tool_metadata(tmp_path: Path) -> N
             [(event.event_type, event.payload) for event in storage.list_events(turn_id)],
         )
         assert turn["input_text"] == "Spoken question"
-        assert turn["tools"] == ["OpenCodeTool", "BrowserTool"]
+        assert turn["tools"] == [
+            "web_search",
+            "mcp__home_assistant__ha_get_state",
+            "functions.browser_exec",
+            "terminal",
+        ]
         assert [
             {key: invocation.get(key) for key in (
                 "name", "summary", "status", "approval_required", "risk"
@@ -201,15 +212,29 @@ def test_completed_turn_exposes_safe_per_call_tool_metadata(tmp_path: Path) -> N
             for invocation in turn["tool_invocations"]
         ] == [
             {
-                "name": "OpenCodeTool",
+                "name": "web_search",
                 "summary": None,
                 "status": "invoked",
                 "approval_required": False,
                 "risk": None,
             },
             {
-                "name": "BrowserTool",
-                "summary": "Webinhalt abgerufen",
+                "name": "mcp__home_assistant__ha_get_state",
+                "summary": None,
+                "status": "invoked",
+                "approval_required": False,
+                "risk": None,
+            },
+            {
+                "name": "functions.browser_exec",
+                "summary": "Browseraktion ausgeführt",
+                "status": "invoked",
+                "approval_required": False,
+                "risk": None,
+            },
+            {
+                "name": "terminal",
+                "summary": None,
                 "status": "invoked",
                 "approval_required": False,
                 "risk": None,
@@ -221,15 +246,17 @@ def test_completed_turn_exposes_safe_per_call_tool_metadata(tmp_path: Path) -> N
         assert all(invocation["started_at"] for invocation in turn["tool_invocations"])
         assert "/private/path" not in str(turn)
         assert "abc123" not in str(turn)
-        assert "credential:opaque" not in str(turn)
+        assert "invalid tool name" not in str(turn)
+        assert "entity_id=person.andreas" not in str(turn)
         event_stream = api.get(
             f"/v1/turns/{turn_id}/events", headers=auth(token)
         ).text
-        assert "Webinhalt abgerufen" in event_stream
+        assert "Browseraktion ausgeführt" in event_stream
         assert "Suche Wetter in Bochum" not in event_stream
         assert "/private/path" not in event_stream
         assert "abc123" not in event_stream
-        assert "credential:opaque" not in event_stream
+        assert "invalid tool name" not in event_stream
+        assert "entity_id=person.andreas" not in event_stream
 
 
 def test_voice_turn_rejects_unknown_response_style(tmp_path: Path) -> None:

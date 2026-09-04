@@ -7,17 +7,12 @@ listen_port: 18081
 state_dir: /var/lib/talktohermes/INSTANCE
 secret_file: /etc/talktohermes/INSTANCE.secrets
 
-# Only mapped tool identifiers are exposed to the app. Values are safe,
-# alphanumeric display identifiers; omit any tool that should stay private.
-exposed_tools:
-  OpenCodeTool: OpenCodeTool
-  functions.browser_exec: BrowserTool
-
-# Optional public labels, keyed by an exposed display name. These are static,
+# Every valid tool actually started by Hermes is exposed under its real ID.
+# Optional public labels are keyed by that ID. These are static,
 # administrator-reviewed text; runtime tool previews are always discarded.
 tool_summaries:
-  OpenCodeTool: Entwicklungswerkzeug verwendet
-  BrowserTool: Webinhalt abgerufen
+  web_search: Websuche ausgeführt
+  browser_exec: Browseraktion ausgeführt
 
 hermes:
   base_url: http://127.0.0.1:8642

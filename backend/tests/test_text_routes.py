@@ -155,7 +155,7 @@ def test_historical_tool_summary_is_replaced_at_rest_and_sse_egress(tmp_path: Pa
         turn_id,
         "hermes.tool_started",
         {
-            "tool": "BrowserTool",
+            "tool": "Browser",
             "summary": "/private/legacy/path token=abc",
             "unexpected": "secret",
         },
@@ -163,22 +163,22 @@ def test_historical_tool_summary_is_replaced_at_rest_and_sse_egress(tmp_path: Pa
     storage.append_event(
         turn_id,
         "hermes.tool_started",
-        {"tool": "FormerlyExposedTool", "summary": "legacy secret"},
+        {"tool": "Formerly Exposed Tool", "summary": "legacy secret"},
     )
 
     turn = client.get(f"/v1/turns/{turn_id}", headers=auth(token)).json()
     events = client.get(f"/v1/turns/{turn_id}/events", headers=auth(token)).text
 
-    assert [item["name"] for item in turn["tool_invocations"]] == ["BrowserTool"]
-    assert turn["tool_invocations"][0]["summary"] == "Webinhalt abgerufen"
-    assert "Webinhalt abgerufen" in events
+    assert [item["name"] for item in turn["tool_invocations"]] == ["Browser"]
+    assert "summary" not in turn["tool_invocations"][0]
+    assert "Browseraktion ausgeführt" not in events
     assert "/private/legacy/path" not in str(turn)
     assert "/private/legacy/path" not in events
     assert "token=abc" not in str(turn)
     assert "token=abc" not in events
     assert "unexpected" not in events
-    assert "FormerlyExposedTool" not in str(turn)
-    assert "FormerlyExposedTool" not in events
+    assert "Formerly Exposed Tool" not in str(turn)
+    assert "Formerly Exposed Tool" not in events
     assert "legacy secret" not in str(turn)
     assert "legacy secret" not in events
 

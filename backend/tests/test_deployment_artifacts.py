@@ -126,13 +126,11 @@ def test_instance_example_has_loopback_hermes_and_only_placeholders() -> None:
     assert config["hermes"]["base_url"] == "http://127.0.0.1:8642"
     assert config["listen_host"] == "127.0.0.1"
     assert config["assistant_name"] == "ASSISTANT_NAME"
-    assert config["exposed_tools"] == {
-        "OpenCodeTool": "OpenCodeTool",
-        "functions.browser_exec": "BrowserTool",
-    }
+    assert "tool_display_names" not in config
+    assert "exposed_tools" not in config
     assert config["tool_summaries"] == {
-        "OpenCodeTool": "Entwicklungswerkzeug verwendet",
-        "BrowserTool": "Webinhalt abgerufen",
+        "web_search": "Websuche ausgeführt",
+        "browser_exec": "Browseraktion ausgeführt",
     }
     assert config["state_dir"] == "/var/lib/talktohermes/INSTANCE"
     assert config["secret_file"] == "/etc/talktohermes/INSTANCE.secrets"
@@ -171,13 +169,11 @@ def test_user_instance_example_matches_user_service_paths() -> None:
     assert config["state_dir"] == "/home/INSTANCE/.local/state/talktohermes/INSTANCE"
     assert config["secret_file"] == "/home/INSTANCE/.config/talktohermes/INSTANCE.secrets"
     assert config["assistant_name"] == "ASSISTANT_NAME"
-    assert config["exposed_tools"] == {
-        "OpenCodeTool": "OpenCodeTool",
-        "functions.browser_exec": "BrowserTool",
-    }
+    assert "tool_display_names" not in config
+    assert "exposed_tools" not in config
     assert config["tool_summaries"] == {
-        "OpenCodeTool": "Entwicklungswerkzeug verwendet",
-        "BrowserTool": "Webinhalt abgerufen",
+        "web_search": "Websuche ausgeführt",
+        "browser_exec": "Browseraktion ausgeführt",
     }
     assert config["voice_worker"]["script"] == (
         "/home/INSTANCE/.local/opt/talktohermes/current/backend/worker/"
@@ -367,8 +363,8 @@ def test_product_identity_is_preserved_and_signing_is_portable() -> None:
     assert project.count("PRODUCT_BUNDLE_IDENTIFIER = net.acelab.TalkToHermes;") == 2
     assert project.count("PRODUCT_BUNDLE_IDENTIFIER = net.acelab.TalkToHermesTests;") == 2
     assert project.count("PRODUCT_BUNDLE_IDENTIFIER = net.acelab.TalkToHermesUITests;") == 2
-    assert project.count("MARKETING_VERSION = 1.0.2;") == 6
-    assert project.count("CURRENT_PROJECT_VERSION = 2;") == 6
+    assert project.count("MARKETING_VERSION = 1.0.3;") == 6
+    assert project.count("CURRENT_PROJECT_VERSION = 3;") == 6
 
     keychain = (ROOT / "ios/TalkToHermes/TalkToHermes/KeychainStore.swift").read_text()
     content = (ROOT / "ios/TalkToHermes/TalkToHermes/ContentView.swift").read_text()

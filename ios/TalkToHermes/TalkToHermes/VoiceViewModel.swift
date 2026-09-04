@@ -47,8 +47,8 @@ final class VoiceViewModel: ObservableObject {
                     toolInvocations: [
                         ChatToolInvocation(
                             id: "tool-6",
-                            name: "OpenCodeTool",
-                            summary: "Projekt öffnen",
+                            name: "read_file",
+                            summary: "Datei gelesen",
                             status: "invoked",
                             startedAt: "2026-09-04T17:00:00Z",
                             approvalRequired: false,
@@ -56,8 +56,8 @@ final class VoiceViewModel: ObservableObject {
                         ),
                         ChatToolInvocation(
                             id: "tool-7",
-                            name: "BrowserTool",
-                            summary: "Wetter für Bochum suchen",
+                            name: "mcp__home_assistant__ha_get_state",
+                            summary: "Status in Home Assistant abgerufen",
                             status: "invoked",
                             startedAt: "2026-09-04T17:00:01Z",
                             approvalRequired: true,
