@@ -83,27 +83,35 @@ struct ContentView: View {
     }
 
     private func compactContent(_ metrics: VoiceLayoutMetrics) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 16) {
-                    brandHeader
-                    voiceStage(diameter: metrics.orbDiameter)
-                    conversationContent
-                    chatBottomAnchor
+        VStack(spacing: 0) {
+            if VoiceLayout.pinsBrandHeader(for: metrics.mode) {
+                brandHeader
+                    .frame(maxWidth: 680)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 16) {
+                        voiceStage(diameter: metrics.orbDiameter)
+                        conversationContent
+                        chatBottomAnchor
+                    }
+                    .frame(maxWidth: 680)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: 680)
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-                .padding(.bottom, 24)
-                .frame(maxWidth: .infinity)
-            }
-            .scrollIndicators(.hidden)
-            .onChange(of: model.chatHistory.exchanges.last?.id) { _, latestID in
-                scrollToLatest(latestID, using: proxy)
-            }
-            .onChange(of: model.approvalRequired) { previous, current in
-                if ChatAutoScroll.shouldRevealApproval(from: previous, to: current) {
-                    scrollToBottom(using: proxy)
+                .scrollIndicators(.hidden)
+                .onChange(of: model.chatHistory.exchanges.last?.id) { _, latestID in
+                    scrollToLatest(latestID, using: proxy)
+                }
+                .onChange(of: model.approvalRequired) { previous, current in
+                    if ChatAutoScroll.shouldRevealApproval(from: previous, to: current) {
+                        scrollToBottom(using: proxy)
+                    }
                 }
             }
         }

@@ -23,6 +23,10 @@ nonisolated struct VoiceLayoutMetrics: Equatable, Sendable {
 }
 
 nonisolated enum VoiceLayout {
+    static func pinsBrandHeader(for mode: VoiceLayoutMode) -> Bool {
+        mode == .compact
+    }
+
     static func bottomBarMode(isAccessibilitySize: Bool) -> VoiceBottomBarMode {
         isAccessibilitySize ? .stacked : .horizontal
     }

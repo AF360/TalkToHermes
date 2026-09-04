@@ -108,6 +108,10 @@ struct VoiceWorkflowTests {
         #expect(BridgeIdentity.requiresConversationReset(from: klaus, to: renamed))
     }
 
+    @Test func pinsBrandHeaderAboveCompactConversationScroll() {
+        #expect(VoiceLayout.pinsBrandHeader(for: .compact))
+    }
+
     @Test func usesCompactVoiceStageOnIPhoneWidth() {
         let metrics = VoiceLayout.metrics(for: 390)
 
