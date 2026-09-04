@@ -103,7 +103,7 @@ def create_app(
                 raise first_close_error
 
     app = FastAPI(
-        title="TalkToHermes Voice Bridge", version="1.0.1", lifespan=lifespan
+        title="TalkToHermes Voice Bridge", version="1.0.2", lifespan=lifespan
     )
 
     class RequestBodyTooLarge(Exception):
@@ -374,7 +374,21 @@ def create_app(
     async def get_turn(turn_id: str) -> dict[str, Any]:
         turn = require_turn(turn_id)
         result = turn.public_dict()
-        result["tools"] = app.state.storage.list_tool_names(turn_id)
+        exposed_tool_names = set(settings.exposed_tools.values())
+        result["tools"] = [
+            name
+            for name in app.state.storage.list_tool_names(turn_id)
+            if name in exposed_tool_names
+        ]
+        result["tool_invocations"] = [
+            invocation
+            for invocation in app.state.storage.list_tool_invocations(turn_id)
+            if invocation["name"] in exposed_tool_names
+        ]
+        for invocation in result["tool_invocations"]:
+            summary = settings.tool_summaries.get(invocation["name"])
+            if summary is not None:
+                invocation["summary"] = summary
         return result
 
     @app.get(
@@ -390,28 +404,31 @@ def create_app(
             replay_after = int(last_event_id or "0")
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Invalid Last-Event-ID") from exc
-        latest_sequence = max(
-            (event.sequence for event in app.state.storage.list_events(turn_id)), default=0
-        )
+        latest_sequence = app.state.storage.latest_event_sequence(turn_id)
         if replay_after < 0 or replay_after > latest_sequence:
             raise HTTPException(status_code=422, detail="Invalid Last-Event-ID")
+        exposed_tool_names = set(settings.exposed_tools.values())
 
         async def stream():
             sequence = replay_after
-            terminal_event_seen = False
             while True:
-                emitted = False
-                events = app.state.storage.list_events(turn_id)
+                events = app.state.storage.list_events_after(turn_id, sequence)
                 for event in events:
-                    if event.sequence <= sequence:
-                        if event.event_type in {"turn.completed", "turn.failed", "turn.cancelled"}:
-                            terminal_event_seen = True
-                        continue
+                    event_payload = event.payload
+                    if event.event_type == "hermes.tool_started":
+                        tool = event.payload.get("tool")
+                        if not isinstance(tool, str) or tool not in exposed_tool_names:
+                            sequence = event.sequence
+                            continue
+                        event_payload = {"tool": tool}
+                        summary = settings.tool_summaries.get(tool)
+                        if summary is not None:
+                            event_payload["summary"] = summary
                     payload = {
                         "turn_id": turn_id,
                         "sequence": event.sequence,
                         "timestamp": event.created_at,
-                        **event.payload,
+                        **event_payload,
                     }
                     yield (
                         f"id: {event.sequence}\n"
@@ -419,13 +436,12 @@ def create_app(
                         f"data: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}\n\n"
                     )
                     sequence = event.sequence
-                    emitted = True
-                    if event.event_type in {"turn.completed", "turn.failed", "turn.cancelled"}:
-                        terminal_event_seen = True
                 if (
                     app.state.storage.get_turn(turn_id).state in TERMINAL_STATES
-                    and terminal_event_seen
-                    and not emitted
+                    and app.state.storage.has_terminal_event_at_or_before(
+                        turn_id, sequence
+                    )
+                    and sequence >= app.state.storage.latest_event_sequence(turn_id)
                 ):
                     break
                 await asyncio.sleep(0.1)

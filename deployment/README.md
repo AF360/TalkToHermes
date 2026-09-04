@@ -154,7 +154,7 @@ An empty result is required for a new instance. For an upgrade, the known `talkt
 
    `uv` itself must be an administrator-reviewed pinned installation. If the target is offline, pre-populate the reviewed uv cache and add `--offline`; do not remove `--frozen` or fall back to network-resolved `pip install`.
 
-3. Copy `config/instance.yaml.example`, replace every `INSTANCE` and `ASSISTANT_NAME`, select the checked bridge port, set `assistant_name` explicitly to that bridge's printable, unpadded 1–64-character display identity, curate the fail-closed `exposed_tools` mapping, and set the ordered provider lists. Only mapped tool identifiers are returned to the app; unknown tools remain private. Keep `development: false`; only the bridge and Hermes URLs are loopback. Omit unavailable optional fallback providers instead of configuring dummy endpoints:
+3. Copy `config/instance.yaml.example`, replace every `INSTANCE` and `ASSISTANT_NAME`, select the checked bridge port, set `assistant_name` explicitly to that bridge's printable, unpadded 1–64-character display identity, curate the fail-closed `exposed_tools` mapping with a unique display name per internal tool, and optionally curate static public `tool_summaries` keyed by those display names. Runtime previews are always discarded; never copy arguments, paths, URLs, credentials, prompts, or results into a summary. Only mapped tool identifiers are returned to the app; unknown tools remain private. Keep `development: false`; only the bridge and Hermes URLs are loopback. Omit unavailable optional fallback providers instead of configuring dummy endpoints:
 
    ```sh
    install -d -o root -g root -m 0755 /etc/talktohermes

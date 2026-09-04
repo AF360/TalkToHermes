@@ -56,6 +56,36 @@ struct APIModelsTests {
         #expect(response.tools == ["OpenCodeTool", "SuperAsteroidsTool"])
     }
 
+    @Test func decodesSafePerCallToolMetadata() throws {
+        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tools":["OpenCodeTool"],"tool_invocations":[{"id":"tool-6","name":"OpenCodeTool","summary":"Projekt öffnen","status":"invoked","started_at":"2026-09-04T17:00:00Z","approval_required":true,"risk":"high"}],"error_code":null}"#.utf8)
+
+        let response = try JSONDecoder().decode(TurnResponse.self, from: data)
+
+        #expect(response.toolInvocations == [
+            ToolInvocation(
+                id: "tool-6",
+                name: "OpenCodeTool",
+                summary: "Projekt öffnen",
+                status: "invoked",
+                startedAt: "2026-09-04T17:00:00Z",
+                approvalRequired: true,
+                risk: "high"
+            )
+        ])
+    }
+
+    @Test func toleratesMissingFutureAndMalformedToolDetailsElementwise() throws {
+        let data = Data(#"{"turn_id":"turn-1","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tools":["OpenCodeTool"],"tool_invocations":[{"id":"tool-6","name":"OpenCodeTool","status":"future-status","risk":"future-risk"},{"id":42,"name":"Broken"}]}"#.utf8)
+
+        let response = try JSONDecoder().decode(TurnResponse.self, from: data)
+
+        #expect(response.toolInvocations.count == 1)
+        #expect(response.toolInvocations[0].status == "future-status")
+        #expect(response.toolInvocations[0].startedAt == nil)
+        #expect(response.toolInvocations[0].approvalRequired == false)
+        #expect(response.toolInvocations[0].risk == "future-risk")
+    }
+
     @Test func decodesKnownLegacyStatusWithoutAssistantName() throws {
         let data = Data(#"{"status":"ready","instance_id":"johanna"}"#.utf8)
 

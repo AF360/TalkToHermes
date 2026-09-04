@@ -1,15 +1,81 @@
+import CoreGraphics
 import Foundation
+
+nonisolated struct ChatToolInvocation: Identifiable, Equatable, Sendable {
+    let id: String
+    let name: String
+    let summary: String?
+    let status: String?
+    let startedAt: String?
+    let approvalRequired: Bool?
+    let risk: String?
+
+    static func detailed(_ invocation: ToolInvocation) -> ChatToolInvocation {
+        ChatToolInvocation(
+            id: invocation.id,
+            name: invocation.name,
+            summary: invocation.summary,
+            status: invocation.status,
+            startedAt: invocation.startedAt,
+            approvalRequired: invocation.approvalRequired,
+            risk: invocation.risk
+        )
+    }
+
+    static func legacy(id: String, name: String) -> ChatToolInvocation {
+        ChatToolInvocation(
+            id: id,
+            name: name,
+            summary: nil,
+            status: nil,
+            startedAt: nil,
+            approvalRequired: nil,
+            risk: nil
+        )
+    }
+
+    func accessibilityIdentifier(exchangeID: String) -> String {
+        "ToolInvocation-\(exchangeID)-\(id)"
+    }
+}
 
 nonisolated struct ChatExchange: Identifiable, Equatable, Sendable {
     let id: String
     let userText: String?
     let assistantText: String
     let assistantName: String
-    let tools: [String]
+    let toolInvocations: [ChatToolInvocation]
+
+    init(
+        id: String,
+        userText: String?,
+        assistantText: String,
+        assistantName: String,
+        tools: [String] = [],
+        toolInvocations: [ChatToolInvocation] = []
+    ) {
+        self.id = id
+        self.userText = userText
+        self.assistantText = assistantText
+        self.assistantName = assistantName
+        self.toolInvocations = toolInvocations.isEmpty
+            ? tools.enumerated().map {
+                ChatToolInvocation.legacy(id: "legacy-\($0.offset)", name: $0.element)
+            }
+            : toolInvocations
+    }
+
+    var tools: [String] {
+        toolInvocations.map(\.name)
+    }
 }
 
 nonisolated struct ChatHistory: Equatable, Sendable {
     private(set) var exchanges: [ChatExchange] = []
+
+    init(exchanges: [ChatExchange] = []) {
+        self.exchanges = exchanges
+    }
 
     mutating func append(_ turn: TurnResponse, assistantName: String) {
         let trimmedUserText = turn.inputText?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -26,7 +92,8 @@ nonisolated struct ChatHistory: Equatable, Sendable {
                 userText: userText,
                 assistantText: assistantText,
                 assistantName: assistantName,
-                tools: turn.tools
+                tools: turn.tools,
+                toolInvocations: turn.toolInvocations.map(ChatToolInvocation.detailed)
             )
         )
     }
@@ -45,4 +112,8 @@ nonisolated enum ChatToolName {
         }
         return trimmed.prefix(1).uppercased() + trimmed.dropFirst()
     }
+}
+
+nonisolated enum ToolActivityLayout {
+    static let markerTouchDiameter: CGFloat = 44
 }

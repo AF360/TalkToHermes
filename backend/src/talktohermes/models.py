@@ -30,6 +30,16 @@ class TurnAcceptedResponse(StrictModel):
     events_url: str
 
 
+class ToolInvocationResponse(StrictModel):
+    id: str = Field(pattern=r"^tool-[1-9][0-9]*$")
+    name: ExposedToolName
+    summary: str | None = Field(default=None, min_length=1, max_length=160)
+    status: Literal["invoked"] = "invoked"
+    started_at: str = Field(min_length=1, max_length=64)
+    approval_required: bool = False
+    risk: Literal["low", "medium", "high"] | None = None
+
+
 class TurnResponse(StrictModel):
     turn_id: str
     conversation_id: str
@@ -40,6 +50,9 @@ class TurnResponse(StrictModel):
     response_text: str | None = None
     input_text: str | None = None
     tools: list[ExposedToolName] = Field(default_factory=list)
+    tool_invocations: list[ToolInvocationResponse] = Field(
+        default_factory=list, max_length=256
+    )
     error_code: str | None = None
     degraded_local_audio: bool = False
 

@@ -9,7 +9,15 @@ from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from .response_style import DEFAULT_VOICE_INSTRUCTIONS
 from .worker_security import WorkerPathError, validate_worker_paths
@@ -141,6 +149,7 @@ class Settings(BaseModel):
     secret_file: Path
     app_token: SecretStr
     exposed_tools: dict[str, str] = Field(default_factory=dict)
+    tool_summaries: dict[str, str] = Field(default_factory=dict)
     hermes: HermesSettings
     stt: tuple[STTProviderSettings, ...] = Field(min_length=1, max_length=3)
     tts: tuple[TTSProviderSettings, ...] = Field(min_length=1, max_length=3)
@@ -161,13 +170,34 @@ class Settings(BaseModel):
     @field_validator("exposed_tools")
     @classmethod
     def validate_exposed_tools(cls, value: dict[str, str]) -> dict[str, str]:
-        if len(value) > 64 or any(
-            INTERNAL_TOOL_ID_RE.fullmatch(tool_id) is None
-            or EXPOSED_TOOL_NAME_RE.fullmatch(display_name) is None
-            for tool_id, display_name in value.items()
+        if (
+            len(value) > 64
+            or len(set(value.values())) != len(value)
+            or any(
+                INTERNAL_TOOL_ID_RE.fullmatch(tool_id) is None
+                or EXPOSED_TOOL_NAME_RE.fullmatch(display_name) is None
+                for tool_id, display_name in value.items()
+            )
         ):
             raise ValueError("invalid exposed tool mapping")
         return value
+
+    @model_validator(mode="after")
+    def validate_tool_summaries(self) -> Settings:
+        exposed_names = set(self.exposed_tools.values())
+        if (
+            len(self.tool_summaries) > 64
+            or not set(self.tool_summaries).issubset(exposed_names)
+            or any(
+                EXPOSED_TOOL_NAME_RE.fullmatch(tool_name) is None
+                or not 1 <= len(summary) <= 160
+                or summary != summary.strip()
+                or not summary.isprintable()
+                for tool_name, summary in self.tool_summaries.items()
+            )
+        ):
+            raise ValueError("invalid tool summaries")
+        return self
 
 
 def _read_secret_file(path: Path) -> dict[str, str]:

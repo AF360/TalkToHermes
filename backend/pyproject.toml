@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "talktohermes"
-version = "1.0.1"
+version = "1.0.2"
 description = "Narrow multi-instance iOS voice bridge for Hermes Agent"
 requires-python = ">=3.13,<3.14"
 dependencies = [

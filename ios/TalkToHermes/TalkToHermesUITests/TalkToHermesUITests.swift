@@ -81,6 +81,37 @@ final class TalkToHermesUITests: XCTestCase {
     }
 
     @MainActor
+    func testShowsOneMarkerPerToolCallAndOpensSafeDetails() throws {
+        XCUIDevice.shared.orientation = .portrait
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-AppleLanguages", "(de)", "-AppleLocale", "de_DE",
+            "--ui-test-tool-activity",
+        ]
+        app.launch()
+        app.swipeUp()
+
+        let firstCall = app.buttons["ToolInvocation-ui-tool-turn-tool-6"]
+        let secondCall = app.buttons["ToolInvocation-ui-tool-turn-tool-7"]
+        XCTAssertTrue(
+            firstCall.waitForExistence(timeout: 3),
+            app.debugDescription
+        )
+        XCTAssertTrue(secondCall.exists)
+
+        firstCall.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["OpenCode Tool"].waitForExistence(timeout: 3),
+            app.debugDescription
+        )
+        XCTAssertTrue(app.staticTexts["Tool-Aufruf 1"].exists)
+        XCTAssertTrue(app.staticTexts["Projekt öffnen"].exists)
+        XCTAssertTrue(app.staticTexts["Aufgerufen"].exists)
+        XCTAssertTrue(app.staticTexts["Nicht erforderlich"].exists)
+    }
+
+    @MainActor
     func testOpensSecureConnectionSettings() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]

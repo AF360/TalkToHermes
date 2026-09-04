@@ -148,37 +148,88 @@ def test_authenticated_voice_turn_runs_stt_hermes_tts_and_downloads_audio(tmp_pa
     assert storage.get_turn(turn_id).response_style == "detailed"
 
 
-def test_completed_turn_exposes_transcript_and_safe_unique_tool_names(tmp_path: Path) -> None:
-    api, token, _, hermes, _, _ = client(tmp_path)
+def test_completed_turn_exposes_safe_per_call_tool_metadata(tmp_path: Path) -> None:
+    api, token, storage, hermes, _, _ = client(tmp_path)
 
     async def events(run_id: str) -> AsyncIterator[dict]:
-        yield {"event": "tool.started", "tool": "OpenCodeTool", "preview": "/private/path"}
-        yield {"event": "tool.started", "tool": "credential:opaque"}
-        yield {"event": "tool.started", "tool": "functions.browser_exec"}
+        yield {
+            "event": "tool.started",
+            "tool": "OpenCodeTool",
+            "preview": "Öffne /private/path mit token=abc123",
+        }
+
+        yield {"event": "tool.started", "tool": "credential:opaque", "preview": "secret"}
+        yield {
+            "event": "tool.started",
+            "tool": "functions.browser_exec",
+            "preview": "Suche Wetter in Bochum",
+        }
+
         yield {"event": "run.completed", "output": "Die Antwort"}
 
     hermes.events = events  # type: ignore[method-assign]
-    conversation_id = api.post("/v1/conversations", headers=auth(token)).json()["conversation_id"]
-    submitted = api.post(
-        f"/v1/conversations/{conversation_id}/turns",
-        headers=auth(token),
-        files={"audio": ("question.wav", wav_bytes(), "audio/wav")},
-        data={"client_turn_id": "b2de28e1-8f40-4ae0-9350-c693e99bcfea"},
-    )
 
-    turn_id = submitted.json()["turn_id"]
-    turn: dict = {}
-    for _ in range(100):
-        turn = api.get(f"/v1/turns/{turn_id}", headers=auth(token)).json()
-        if turn["state"] in {"completed", "failed", "cancelled"}:
-            break
-        time.sleep(0.01)
+    with api:
+        conversation_id = api.post(
+            "/v1/conversations", headers=auth(token)
+        ).json()["conversation_id"]
+        submitted = api.post(
+            f"/v1/conversations/{conversation_id}/turns",
+            headers=auth(token),
+            files={"audio": ("question.wav", wav_bytes(), "audio/wav")},
+            data={"client_turn_id": "b2de28e1-8f40-4ae0-9350-c693e99bcfea"},
+        )
 
-    assert turn["state"] == "completed"
-    assert turn["input_text"] == "Spoken question"
-    assert turn["tools"] == ["OpenCodeTool", "BrowserTool"]
-    assert "/private/path" not in str(turn)
-    assert "credential:opaque" not in str(turn)
+        turn_id = submitted.json()["turn_id"]
+        turn: dict = {}
+        for _ in range(100):
+            turn = api.get(f"/v1/turns/{turn_id}", headers=auth(token)).json()
+            if turn["state"] in {"completed", "failed", "cancelled"}:
+                break
+            time.sleep(0.01)
+
+        assert turn["state"] == "completed", (
+            turn,
+            [(event.event_type, event.payload) for event in storage.list_events(turn_id)],
+        )
+        assert turn["input_text"] == "Spoken question"
+        assert turn["tools"] == ["OpenCodeTool", "BrowserTool"]
+        assert [
+            {key: invocation.get(key) for key in (
+                "name", "summary", "status", "approval_required", "risk"
+            )}
+            for invocation in turn["tool_invocations"]
+        ] == [
+            {
+                "name": "OpenCodeTool",
+                "summary": None,
+                "status": "invoked",
+                "approval_required": False,
+                "risk": None,
+            },
+            {
+                "name": "BrowserTool",
+                "summary": "Webinhalt abgerufen",
+                "status": "invoked",
+                "approval_required": False,
+                "risk": None,
+            },
+        ]
+        assert all(
+            invocation["id"].startswith("tool-") for invocation in turn["tool_invocations"]
+        )
+        assert all(invocation["started_at"] for invocation in turn["tool_invocations"])
+        assert "/private/path" not in str(turn)
+        assert "abc123" not in str(turn)
+        assert "credential:opaque" not in str(turn)
+        event_stream = api.get(
+            f"/v1/turns/{turn_id}/events", headers=auth(token)
+        ).text
+        assert "Webinhalt abgerufen" in event_stream
+        assert "Suche Wetter in Bochum" not in event_stream
+        assert "/private/path" not in event_stream
+        assert "abc123" not in event_stream
+        assert "credential:opaque" not in event_stream
 
 
 def test_voice_turn_rejects_unknown_response_style(tmp_path: Path) -> None:

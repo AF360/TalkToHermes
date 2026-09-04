@@ -53,13 +53,15 @@ def test_static_openapi_matches_development_app_surface(tmp_path: Path) -> None:
         "type": "http",
         "scheme": "bearer",
     }
-    for schema_name in ("StatusResponse", "CancelResponse", "TurnResponse"):
+    for schema_name in (
+        "StatusResponse", "CancelResponse", "ToolInvocationResponse", "TurnResponse"
+    ):
         assert _without_titles(static["components"]["schemas"][schema_name]) == _without_titles(
             generated["components"]["schemas"][schema_name]
         )
 
 
-def test_turn_response_documents_chat_transcript_and_tool_names() -> None:
+def test_turn_response_documents_chat_transcript_and_tool_invocations() -> None:
     static = yaml.safe_load((ROOT / "api/openapi.yaml").read_text(encoding="utf-8"))
     properties = static["components"]["schemas"]["TurnResponse"]["properties"]
     assert properties["input_text"] == {
@@ -68,6 +70,11 @@ def test_turn_response_documents_chat_transcript_and_tool_names() -> None:
     assert properties["tools"] == {
         "type": "array",
         "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{0,63}$"},
+    }
+    assert properties["tool_invocations"] == {
+        "type": "array",
+        "maxItems": 256,
+        "items": {"$ref": "#/components/schemas/ToolInvocationResponse"},
     }
 
 

@@ -63,6 +63,8 @@ secret_file: {secret}
 exposed_tools:
   OpenCodeTool: OpenCodeTool
   functions.browser_exec: BrowserTool
+tool_summaries:
+  BrowserTool: Webinhalt abgerufen
 hermes:
   base_url: http://127.0.0.1:8642
 stt:
@@ -148,6 +150,49 @@ def test_rejects_padded_assistant_name(tmp_path: Path) -> None:
         load_settings(config)
 
 
+def test_rejects_duplicate_exposed_tool_display_names(tmp_path: Path) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text().replace(
+            "functions.browser_exec: BrowserTool",
+            "functions.browser_exec: OpenCodeTool",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+def test_rejects_tool_summary_without_exposed_display_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text().replace(
+            "  BrowserTool: Webinhalt abgerufen",
+            "  UnknownTool: Verborgene Aktion",
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+@pytest.mark.parametrize("summary", [" secret ", "x" * 161, "Zeile\\nUmbruch"])
+def test_rejects_invalid_static_tool_summary(tmp_path: Path, summary: str) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text().replace(
+            "  BrowserTool: Webinhalt abgerufen",
+            f'  BrowserTool: "{summary}"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
 def test_loads_valid_isolated_instance(tmp_path: Path) -> None:
     settings = load_settings(write_instance(tmp_path))
     assert settings.instance_id == "instance-a"
@@ -156,6 +201,7 @@ def test_loads_valid_isolated_instance(tmp_path: Path) -> None:
         "OpenCodeTool": "OpenCodeTool",
         "functions.browser_exec": "BrowserTool",
     }
+    assert settings.tool_summaries == {"BrowserTool": "Webinhalt abgerufen"}
     assert settings.listen_port == 0
     assert settings.app_token.get_secret_value() == "a" * 48
     assert settings.hermes.api_key.get_secret_value() == "h" * 48

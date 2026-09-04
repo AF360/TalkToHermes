@@ -82,6 +82,22 @@ def test_events_are_monotonic_and_survive_reopen(tmp_path: Path) -> None:
     assert [event.sequence for event in reopened.list_events(turn.id)] == [1, 2]
 
 
+def test_event_replay_queries_are_bounded_and_incremental(tmp_path: Path) -> None:
+    db = storage(tmp_path)
+    conversation = db.create_conversation("hs-paged-events")
+    turn, _ = db.create_or_get_text_turn(conversation.id, "paged", "Hallo")
+    for index in range(300):
+        db.append_event(turn.id, "test.event", {"index": index})
+
+    first = db.list_events_after(turn.id, 0, limit=64)
+    second = db.list_events_after(turn.id, first[-1].sequence, limit=64)
+
+    assert len(first) == 64
+    assert len(second) == 64
+    assert second[0].sequence == first[-1].sequence + 1
+    assert db.latest_event_sequence(turn.id) == 300
+
+
 def test_tool_names_query_is_ordered_unique_and_safe(tmp_path: Path) -> None:
     db = storage(tmp_path)
     conversation = db.create_conversation("hs-1")
@@ -95,6 +111,170 @@ def test_tool_names_query_is_ordered_unique_and_safe(tmp_path: Path) -> None:
     db.append_event(turn.id, "hermes.tool_started", {"tool": 42})
 
     assert db.list_tool_names(turn.id) == ["OpenCodeTool", "BrowserTool"]
+
+
+def test_tool_invocations_preserve_each_call_and_safe_lifecycle_metadata(tmp_path: Path) -> None:
+    db = storage(tmp_path)
+    conversation = db.create_conversation("hs-tools")
+    turn, _ = db.create_or_get_text_turn(conversation.id, "client-tools", "Hallo")
+
+    db.append_event(
+        turn.id,
+        "hermes.approval_required",
+        {"tool": "OpenCodeTool", "risk": "high", "choices": ["once", "deny"]},
+    )
+    db.append_event(
+        turn.id,
+        "hermes.approval_resolved",
+        {"decision": "once"},
+    )
+    first = db.append_event(
+        turn.id,
+        "hermes.tool_started",
+        {"tool": "OpenCodeTool", "summary": "Projekt öffnen"},
+    )
+    second = db.append_event(
+        turn.id,
+        "hermes.tool_started",
+        {"tool": "OpenCodeTool", "summary": "Tests ausführen"},
+    )
+
+    assert db.list_tool_invocations(turn.id) == [
+        {
+            "id": f"tool-{first.sequence}",
+            "name": "OpenCodeTool",
+            "status": "invoked",
+            "started_at": first.created_at,
+            "approval_required": True,
+            "risk": "high",
+        },
+        {
+            "id": f"tool-{second.sequence}",
+            "name": "OpenCodeTool",
+            "status": "invoked",
+            "started_at": second.created_at,
+            "approval_required": False,
+        },
+    ]
+
+
+def test_denied_or_unresolved_approval_is_not_attached_to_later_call(tmp_path: Path) -> None:
+    db = storage(tmp_path)
+    conversation = db.create_conversation("hs-approval-correlation")
+
+    denied, _ = db.create_or_get_text_turn(conversation.id, "denied", "Hallo")
+    db.append_event(
+        denied.id, "hermes.approval_required", {"tool": "BrowserTool", "risk": "medium"}
+    )
+    db.append_event(denied.id, "hermes.approval_resolved", {"decision": "deny"})
+    denied_start = db.append_event(
+        denied.id, "hermes.tool_started", {"tool": "BrowserTool"}
+    )
+
+    unresolved, _ = db.create_or_get_text_turn(conversation.id, "unresolved", "Hallo")
+    db.append_event(
+        unresolved.id, "hermes.approval_required", {"tool": "BrowserTool", "risk": "high"}
+    )
+    unresolved_start = db.append_event(
+        unresolved.id, "hermes.tool_started", {"tool": "BrowserTool"}
+    )
+
+    assert db.list_tool_invocations(denied.id) == [
+        {
+            "id": f"tool-{denied_start.sequence}",
+            "name": "BrowserTool",
+            "status": "invoked",
+            "started_at": denied_start.created_at,
+            "approval_required": False,
+        }
+    ]
+    assert db.list_tool_invocations(unresolved.id) == [
+        {
+            "id": f"tool-{unresolved_start.sequence}",
+            "name": "BrowserTool",
+            "status": "invoked",
+            "started_at": unresolved_start.created_at,
+            "approval_required": False,
+        }
+    ]
+
+
+def test_approved_metadata_expires_on_next_nonmatching_tool_start(tmp_path: Path) -> None:
+    db = storage(tmp_path)
+    conversation = db.create_conversation("hs-stale-approval")
+    turn, _ = db.create_or_get_text_turn(conversation.id, "stale", "Hallo")
+    db.append_event(
+        turn.id, "hermes.approval_required", {"tool": "OpenCodeTool", "risk": "high"}
+    )
+    db.append_event(turn.id, "hermes.approval_resolved", {"decision": "once"})
+    beta = db.append_event(turn.id, "hermes.tool_started", {"tool": "BrowserTool"})
+    alpha = db.append_event(turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"})
+
+    assert db.list_tool_invocations(turn.id) == [
+        {
+            "id": f"tool-{beta.sequence}",
+            "name": "BrowserTool",
+            "status": "invoked",
+            "started_at": beta.created_at,
+            "approval_required": False,
+        },
+        {
+            "id": f"tool-{alpha.sequence}",
+            "name": "OpenCodeTool",
+            "status": "invoked",
+            "started_at": alpha.created_at,
+            "approval_required": False,
+        },
+    ]
+
+
+def test_unmapped_approval_request_clears_previous_correlation(tmp_path: Path) -> None:
+    db = storage(tmp_path)
+    conversation = db.create_conversation("hs-unmapped-approval")
+    turn, _ = db.create_or_get_text_turn(conversation.id, "unmapped", "Hallo")
+    db.append_event(
+        turn.id, "hermes.approval_required", {"tool": "OpenCodeTool", "risk": "high"}
+    )
+    db.append_event(turn.id, "hermes.approval_resolved", {"decision": "once"})
+    db.append_event(turn.id, "hermes.approval_required", {"risk": "medium"})
+    db.append_event(turn.id, "hermes.approval_resolved", {"decision": "once"})
+    started = db.append_event(
+        turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"}
+    )
+
+    assert db.list_tool_invocations(turn.id) == [
+        {
+            "id": f"tool-{started.sequence}",
+            "name": "OpenCodeTool",
+            "status": "invoked",
+            "started_at": started.created_at,
+            "approval_required": False,
+        }
+    ]
+
+
+def test_invalid_tool_start_clears_previous_approval_correlation(tmp_path: Path) -> None:
+    db = storage(tmp_path)
+    conversation = db.create_conversation("hs-invalid-start")
+    turn, _ = db.create_or_get_text_turn(conversation.id, "invalid-start", "Hallo")
+    db.append_event(
+        turn.id, "hermes.approval_required", {"tool": "OpenCodeTool", "risk": "high"}
+    )
+    db.append_event(turn.id, "hermes.approval_resolved", {"decision": "once"})
+    db.append_event(turn.id, "hermes.tool_started", {})
+    started = db.append_event(
+        turn.id, "hermes.tool_started", {"tool": "OpenCodeTool"}
+    )
+
+    assert db.list_tool_invocations(turn.id) == [
+        {
+            "id": f"tool-{started.sequence}",
+            "name": "OpenCodeTool",
+            "status": "invoked",
+            "started_at": started.created_at,
+            "approval_required": False,
+        }
+    ]
 
 
 def test_turn_can_be_completed_without_returning_audio_path(tmp_path: Path) -> None:

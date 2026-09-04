@@ -36,6 +36,38 @@ final class VoiceViewModel: ObservableObject {
 
     init(settingsStore: SettingsStore = SettingsStore()) {
         self.settingsStore = settingsStore
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-tool-activity") {
+            chatHistory = ChatHistory(exchanges: [
+                ChatExchange(
+                    id: "ui-tool-turn",
+                    userText: "Öffne das Projekt und prüfe das Wetter.",
+                    assistantText: "Beide Tool-Aufrufe sind abgeschlossen.",
+                    assistantName: "Klaus",
+                    toolInvocations: [
+                        ChatToolInvocation(
+                            id: "tool-6",
+                            name: "OpenCodeTool",
+                            summary: "Projekt öffnen",
+                            status: "invoked",
+                            startedAt: "2026-09-04T17:00:00Z",
+                            approvalRequired: false,
+                            risk: nil
+                        ),
+                        ChatToolInvocation(
+                            id: "tool-7",
+                            name: "BrowserTool",
+                            summary: "Wetter für Bochum suchen",
+                            status: "invoked",
+                            startedAt: "2026-09-04T17:00:01Z",
+                            approvalRequired: true,
+                            risk: "medium"
+                        ),
+                    ]
+                )
+            ])
+        }
+#endif
     }
 
     var canSpeak: Bool {
@@ -44,6 +76,9 @@ final class VoiceViewModel: ObservableObject {
     }
 
     func refreshConfiguration() async {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-test-tool-activity") { return }
+#endif
         guard !isBusy, !isStartingRecording, !canCancel, !recorder.isRecording else { return }
         configurationRefreshGeneration &+= 1
         let generation = configurationRefreshGeneration

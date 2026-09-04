@@ -13,6 +13,12 @@ exposed_tools:
   OpenCodeTool: OpenCodeTool
   functions.browser_exec: BrowserTool
 
+# Optional public labels, keyed by an exposed display name. These are static,
+# administrator-reviewed text; runtime tool previews are always discarded.
+tool_summaries:
+  OpenCodeTool: Entwicklungswerkzeug verwendet
+  BrowserTool: Webinhalt abgerufen
+
 hermes:
   base_url: http://127.0.0.1:8642
 

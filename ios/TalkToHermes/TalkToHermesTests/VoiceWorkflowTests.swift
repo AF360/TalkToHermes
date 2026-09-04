@@ -72,6 +72,37 @@ struct VoiceWorkflowTests {
         #expect(ChatToolName.display("terminal") == "Terminal")
     }
 
+    @Test func preservesDuplicateDetailedToolCallsAndBuildsLegacyMarkers() throws {
+        let detailedData = Data(#"{"turn_id":"turn-detailed","conversation_id":"conversation-1","client_turn_id":"client-1","state":"completed","created_at":"2026-09-04T17:00:00Z","updated_at":"2026-09-04T17:00:02Z","response_text":"Erledigt","tool_invocations":[{"id":"tool-6","name":"OpenCodeTool","summary":"Projekt öffnen","status":"invoked","started_at":"2026-09-04T17:00:00Z","approval_required":false},{"id":"tool-7","name":"OpenCodeTool","summary":"Tests starten","status":"invoked","started_at":"2026-09-04T17:00:01Z","approval_required":true,"risk":"medium"}]}"#.utf8)
+        let legacyData = Data(#"{"turn_id":"turn-legacy-tools","conversation_id":"conversation-1","client_turn_id":"client-2","state":"completed","created_at":"2026-09-04T17:01:00Z","updated_at":"2026-09-04T17:01:02Z","response_text":"Alt","tools":["BrowserTool"]}"#.utf8)
+        var history = ChatHistory()
+
+        history.append(
+            try JSONDecoder().decode(TurnResponse.self, from: detailedData),
+            assistantName: "Klaus"
+        )
+        history.append(
+            try JSONDecoder().decode(TurnResponse.self, from: legacyData),
+            assistantName: "Klaus"
+        )
+
+        #expect(history.exchanges[0].toolInvocations.map(\.name) == ["OpenCodeTool", "OpenCodeTool"])
+        #expect(history.exchanges[0].toolInvocations.map(\.summary) == ["Projekt öffnen", "Tests starten"])
+        #expect(history.exchanges[1].toolInvocations == [
+            ChatToolInvocation.legacy(id: "legacy-0", name: "BrowserTool")
+        ])
+    }
+
+    @Test func toolMarkersUseUniqueTurnScopedIdentifiersAndAccessibleTouchTargets() {
+        let invocation = ChatToolInvocation.legacy(id: "legacy-0", name: "BrowserTool")
+
+        #expect(
+            invocation.accessibilityIdentifier(exchangeID: "turn-a") ==
+                "ToolInvocation-turn-a-legacy-0"
+        )
+        #expect(ToolActivityLayout.markerTouchDiameter == 44)
+    }
+
     @Test func invalidationRejectsAStaleResponseAudioTicket() {
         var guardState = ResponseAudioGuard()
         let ticket = guardState.makeTicket()

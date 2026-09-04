@@ -62,7 +62,7 @@ MVP decisions are only:
 - `retain_failed_audio=false` removes failed uploads immediately.
 - Completed and cancelled uploads are removed immediately; restart-interrupted work is never retained.
 - Undownloaded answer audio expires after 24 hours. Its first authenticated GET starts one fixed five-minute default retry/reconnect lease; retries do not extend it.
-- Voice input transcripts and answer text remain locally readable for at most 24 hours after a turn becomes terminal. Cleanup then redacts both text fields and removes text-bearing `hermes.delta` events while retaining content-free turn metrics and provider-attempt events. Active turns are never redacted.
+- Voice input transcripts and answer text remain locally readable for at most 24 hours after a turn becomes terminal. Runtime tool previews are never stored. Public tool summaries are static administrator-reviewed configuration labels added only at egress. Cleanup redacts both text fields, removes text-bearing `hermes.delta` events, and removes any legacy `summary` field from retained tool lifecycle events while preserving content-free invocation markers, start time, approval/risk metadata, and provider-attempt events. Active turns are never redacted.
 - Cleanup runs at startup and periodically, is idempotent, stays directly inside the instance audio root, and never follows symlinks or removes wrong-owner/mode entries.
 - The dedicated Hermes session remains the longer-lived canonical conversation context. Local text redaction and TalkToHermes conversation deletion do not currently delete that Hermes session.
 - Text visibility is a client presentation setting and does not alter the Hermes session or the bounded local retention rule.
@@ -76,7 +76,7 @@ Forbidden:
 
 - credentials or authorization headers;
 - raw audio, clone references, transcripts by default;
-- full tool payloads/results;
+- raw tool previews, arguments, payloads, results, prompts, or unmapped internal tool IDs;
 - filesystem paths returned to clients;
 - unredacted model/provider exceptions.
 

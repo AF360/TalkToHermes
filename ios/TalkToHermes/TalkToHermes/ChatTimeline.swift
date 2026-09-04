@@ -38,34 +38,23 @@ struct ChatTimeline: View {
 
     private func assistantEntry(_ exchange: ChatExchange) -> some View {
         VStack(alignment: .leading, spacing: 7) {
-            if !exchange.tools.isEmpty {
-                HStack(spacing: 7) {
-                    Image(systemName: "hammer.fill")
-                        .foregroundStyle(Color.hermesAmber)
-                    Text(exchange.tools.map(ChatToolName.display).joined(separator: " · "))
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 48)
-                .accessibilityLabel(
-                    String(
-                        format: String(localized: "Verwendete Tools: %@"),
-                        exchange.tools.map(ChatToolName.display).joined(separator: ", ")
-                    )
-                )
-                .accessibilityIdentifier("ChatTools-\(exchange.id)")
-            }
-
             HStack(alignment: .top, spacing: 10) {
                 assistantAvatar(for: exchange.assistantName)
                 VStack(alignment: .leading, spacing: 9) {
                     Text(exchange.assistantName)
                         .font(.caption.weight(.bold))
                         .foregroundStyle(Color.hermesCopper)
+                    if !exchange.toolInvocations.isEmpty {
+                        toolInvocationBadges(
+                            exchange.toolInvocations,
+                            exchangeID: exchange.id
+                        )
+                    }
                     Text(exchange.assistantText)
                         .font(.body)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ChatAssistantBubble-\(exchange.id)")
 
                     if exchange.id == exchanges.last?.id {
                         latestActions(for: exchange)
@@ -82,7 +71,35 @@ struct ChatTimeline: View {
                     RoundedRectangle(cornerRadius: 21, style: .continuous)
                         .stroke(.primary.opacity(0.08), lineWidth: 1)
                 }
-                .accessibilityIdentifier("ChatAssistantBubble-\(exchange.id)")
+            }
+        }
+    }
+
+    private func toolInvocationBadges(
+        _ invocations: [ChatToolInvocation],
+        exchangeID: String
+    ) -> some View {
+        LazyVGrid(
+            columns: [
+                GridItem(
+                    .adaptive(
+                        minimum: ToolActivityLayout.markerTouchDiameter,
+                        maximum: ToolActivityLayout.markerTouchDiameter
+                    ),
+                    spacing: 7
+                )
+            ],
+            alignment: .leading,
+            spacing: 7
+        ) {
+            ForEach(invocations.indices, id: \.self) { index in
+                ToolInvocationBadge(
+                    invocation: invocations[index],
+                    ordinal: index + 1,
+                    accessibilityID: invocations[index].accessibilityIdentifier(
+                        exchangeID: exchangeID
+                    )
+                )
             }
         }
     }
@@ -138,8 +155,182 @@ struct ChatTimeline: View {
     }
 }
 
+private struct ToolInvocationBadge: View {
+    let invocation: ChatToolInvocation
+    let ordinal: Int
+    let accessibilityID: String
+    @State private var showsDetails = false
+
+    var body: some View {
+        Button {
+            showsDetails = true
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 34, height: 34)
+                    .overlay {
+                        Circle().stroke(badgeColor.opacity(0.75), lineWidth: 1)
+                    }
+                Image(systemName: toolIcon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(badgeColor)
+                    .frame(width: 34, height: 34)
+                Text("\(ordinal)")
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.hermesGraphite)
+                    .frame(minWidth: 13, minHeight: 13)
+                    .background(Color.hermesAmber, in: Circle())
+                    .offset(x: 4, y: -4)
+            }
+            .frame(
+                width: ToolActivityLayout.markerTouchDiameter,
+                height: ToolActivityLayout.markerTouchDiameter
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            String(
+                format: String(localized: "Details zu %@, Aufruf %d"),
+                ChatToolName.display(invocation.name),
+                ordinal
+            )
+        )
+        .accessibilityHint("Zeigt sichere Details zu diesem Tool-Aufruf.")
+        .accessibilityIdentifier(accessibilityID)
+        .popover(isPresented: $showsDetails, arrowEdge: .top) {
+            ToolInvocationPopover(invocation: invocation, ordinal: ordinal)
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    private var badgeColor: Color { .hermesAmber }
+
+    private var toolIcon: String {
+        let lowered = invocation.name.lowercased()
+        if lowered.contains("browser") || lowered.contains("web") { return "globe" }
+        if lowered.contains("terminal") { return "terminal.fill" }
+        if lowered.contains("code") { return "chevron.left.forwardslash.chevron.right" }
+        if lowered.contains("asteroid") || lowered.contains("game") { return "gamecontroller.fill" }
+        return "hammer.fill"
+    }
+}
+
+private struct ToolInvocationPopover: View {
+    let invocation: ChatToolInvocation
+    let ordinal: Int
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 10) {
+                    Image(systemName: "hammer.fill")
+                        .foregroundStyle(Color.hermesAmber)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(ChatToolName.display(invocation.name))
+                            .font(.headline)
+                        Text(String(format: String(localized: "Tool-Aufruf %d"), ordinal))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Divider()
+
+                Text(invocation.summary ?? String(localized: "Keine weiteren Details verfügbar."))
+                    .font(.subheadline)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(spacing: 8) {
+                    detailRow("Status", String(localized: "Aufgerufen"))
+                    detailRow("Gestartet", startedText)
+                    detailRow("Freigabe", approvalText)
+                    if let riskText {
+                        detailRow("Risiko", riskText)
+                    }
+                }
+            }
+            .padding(18)
+        }
+        .frame(
+            minWidth: 280,
+            idealWidth: 320,
+            maxWidth: 340,
+            maxHeight: 560,
+            alignment: .leading
+        )
+    }
+
+    private func detailRow(_ label: LocalizedStringKey, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 12)
+            Text(value)
+                .font(.caption)
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+
+    private var startedText: String {
+        guard let raw = invocation.startedAt else { return "—" }
+        let precise = ISO8601DateFormatter()
+        precise.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let basic = ISO8601DateFormatter()
+        basic.formatOptions = [.withInternetDateTime]
+        guard let date = precise.date(from: raw) ?? basic.date(from: raw) else { return "—" }
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.dateStyle = .none
+        formatter.timeStyle = .medium
+        return formatter.string(from: date)
+    }
+
+    private var approvalText: String {
+        switch invocation.approvalRequired {
+        case true: String(localized: "Erforderlich")
+        case false: String(localized: "Nicht erforderlich")
+        case nil: String(localized: "Nicht verfügbar")
+        }
+    }
+
+    private var riskText: String? {
+        switch invocation.risk {
+        case "low": String(localized: "Niedrig")
+        case "medium": String(localized: "Mittel")
+        case "high": String(localized: "Hoch")
+        case .some: String(localized: "Nicht verfügbar")
+        case nil: nil
+        }
+    }
+}
+
 #if DEBUG
 private struct ChatTimelinePreviewContent: View {
+    private let toolInvocations = [
+        ChatToolInvocation(
+            id: "tool-6",
+            name: "OpenCodeTool",
+            summary: "Projekt öffnen",
+            status: "invoked",
+            startedAt: "2026-09-04T17:00:00Z",
+            approvalRequired: false,
+            risk: nil
+        ),
+        ChatToolInvocation(
+            id: "tool-7",
+            name: "BrowserTool",
+            summary: "Wetter für Bochum suchen",
+            status: "invoked",
+            startedAt: "2026-09-04T17:00:01Z",
+            approvalRequired: true,
+            risk: "medium"
+        ),
+    ]
+
     var body: some View {
         ZStack {
             HermesBackground()
@@ -151,7 +342,7 @@ private struct ChatTimelinePreviewContent: View {
                             userText: "Öffne bitte den Code für TalkToHermes.",
                             assistantText: "Die aktuelle Arbeitskopie ist geöffnet und der Build ist sauber.",
                             assistantName: "Johanna",
-                            tools: ["OpenCodeTool"]
+                            toolInvocations: toolInvocations
                         ),
                         ChatExchange(
                             id: "preview-2",
@@ -178,5 +369,20 @@ private struct ChatTimelinePreviewContent: View {
 
 #Preview("Chat iPad", traits: .fixedLayout(width: 1024, height: 1366)) {
     ChatTimelinePreviewContent()
+}
+
+#Preview("Tool-Details", traits: .sizeThatFitsLayout) {
+    ToolInvocationPopover(
+        invocation: ChatToolInvocation(
+            id: "tool-7",
+            name: "BrowserTool",
+            summary: "Wetter für Bochum suchen",
+            status: "invoked",
+            startedAt: "2026-09-04T17:00:01Z",
+            approvalRequired: true,
+            risk: "medium"
+        ),
+        ordinal: 2
+    )
 }
 #endif
