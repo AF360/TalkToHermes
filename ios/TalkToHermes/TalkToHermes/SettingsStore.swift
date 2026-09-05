@@ -5,6 +5,7 @@ nonisolated struct StoredSettings: Equatable, Sendable {
     let hasToken: Bool
     let responseStyle: VoiceResponseStyle
     let speechLanguage: SpeechLanguage
+    let colorTheme: HermesColorTheme
 }
 
 nonisolated enum SettingsStoreError: Error, Equatable, LocalizedError {
@@ -23,6 +24,7 @@ nonisolated struct SettingsStore {
     static let portKey = "bridge-port"
     static let responseStyleKey = "voice-response-style"
     static let speechLanguageKey = "speech-language"
+    static let colorThemeKey = "color-theme"
 
     let defaults: UserDefaults
     let keychain: KeychainStore
@@ -41,7 +43,8 @@ nonisolated struct SettingsStore {
         portText: String,
         token: String,
         responseStyle: VoiceResponseStyle = .short,
-        speechLanguage: SpeechLanguage? = nil
+        speechLanguage: SpeechLanguage? = nil,
+        colorTheme: HermesColorTheme? = nil
     ) throws -> EndpointConfiguration {
         let endpoint = try validate(hostText: hostText, portText: portText)
         let normalizedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -57,6 +60,11 @@ nonisolated struct SettingsStore {
                 .flatMap(SpeechLanguage.init(rawValue:))
             ?? .german
         defaults.set(effectiveSpeechLanguage.rawValue, forKey: Self.speechLanguageKey)
+        let effectiveColorTheme = colorTheme
+            ?? defaults.string(forKey: Self.colorThemeKey)
+                .flatMap(HermesColorTheme.init(rawValue:))
+            ?? .default
+        defaults.set(effectiveColorTheme.rawValue, forKey: Self.colorThemeKey)
         return endpoint
     }
 
@@ -92,20 +100,24 @@ nonisolated struct SettingsStore {
             .flatMap(VoiceResponseStyle.init(rawValue:)) ?? .short
         let speechLanguage = defaults.string(forKey: Self.speechLanguageKey)
             .flatMap(SpeechLanguage.init(rawValue:)) ?? .german
+        let colorTheme = defaults.string(forKey: Self.colorThemeKey)
+            .flatMap(HermesColorTheme.init(rawValue:)) ?? .default
         do {
             _ = try keychain.readToken()
             return StoredSettings(
                 endpoint: endpoint,
                 hasToken: true,
                 responseStyle: responseStyle,
-                speechLanguage: speechLanguage
+                speechLanguage: speechLanguage,
+                colorTheme: colorTheme
             )
         } catch KeychainStoreError.itemNotFound {
             return StoredSettings(
                 endpoint: endpoint,
                 hasToken: false,
                 responseStyle: responseStyle,
-                speechLanguage: speechLanguage
+                speechLanguage: speechLanguage,
+                colorTheme: colorTheme
             )
         }
     }

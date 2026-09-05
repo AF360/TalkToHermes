@@ -5,6 +5,7 @@
 //  Created by Ace on 29.08.26.
 //
 
+import UIKit
 import XCTest
 
 final class TalkToHermesUITests: XCTestCase {
@@ -44,6 +45,35 @@ final class TalkToHermesUITests: XCTestCase {
     }
 
     @MainActor
+    func testCompactBrandHeaderStartsCloseToToolbarAndStaysPinned() throws {
+        XCUIDevice.shared.orientation = .portrait
+        try XCTSkipUnless(
+            UIDevice.current.userInterfaceIdiom == .phone,
+            "Compact header geometry applies to iPhone."
+        )
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-AppleLanguages", "(de)", "-AppleLocale", "de_DE",
+            "--ui-test-tool-activity",
+        ]
+        app.launch()
+
+        let title = app.staticTexts["BrandTitle"]
+        let settings = app.buttons["Einstellungen"]
+        XCTAssertTrue(title.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(settings.exists)
+        let scrollingTitle = app.staticTexts["VoiceStageTitle"]
+        XCTAssertTrue(scrollingTitle.exists, app.debugDescription)
+        let initialY = title.frame.minY
+        let initialScrollingY = scrollingTitle.frame.minY
+        XCTAssertLessThanOrEqual(initialY - settings.frame.maxY, 12)
+
+        app.scrollViews.firstMatch.swipeUp()
+        XCTAssertLessThan(scrollingTitle.frame.minY, initialScrollingY - 2)
+        XCTAssertEqual(title.frame.minY, initialY, accuracy: 2)
+    }
+
+    @MainActor
     func testShowsEnglishVoiceHomeScreen() throws {
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
@@ -62,6 +92,7 @@ final class TalkToHermesUITests: XCTestCase {
 
     @MainActor
     func testConfirmsBeforeStartingNewConversation() throws {
+        XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
@@ -70,8 +101,13 @@ final class TalkToHermesUITests: XCTestCase {
         XCTAssertTrue(newConversationButton.waitForExistence(timeout: 3))
         newConversationButton.tap()
 
-        XCTAssertTrue(app.staticTexts["Neue Unterhaltung starten?"].waitForExistence(timeout: 3))
-        XCTAssertTrue(app.staticTexts["Der aktuell angezeigte Chat wird gelöscht."].exists)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["Neue Unterhaltung starten?"].waitForExistence(timeout: 3),
+            app.debugDescription
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)["Der aktuell angezeigte Chat wird gelöscht."].exists
+        )
         XCTAssertTrue(app.buttons["Abbrechen"].exists)
         XCTAssertTrue(app.buttons["Neue Unterhaltung"].exists)
 
@@ -118,7 +154,11 @@ final class TalkToHermesUITests: XCTestCase {
         app.launchArguments += ["-AppleLanguages", "(de)", "-AppleLocale", "de_DE"]
         app.launch()
 
-        app.buttons["Einstellungen"].tap()
+        let settingsButton = app.buttons["SettingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertEqual(settingsButton.frame.width, 44, accuracy: 0.5)
+        XCTAssertEqual(settingsButton.frame.height, 44, accuracy: 0.5)
+        settingsButton.tap()
 
         XCTAssertTrue(app.navigationBars["Einstellungen"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.textFields["Server"].exists)
@@ -128,17 +168,105 @@ final class TalkToHermesUITests: XCTestCase {
         let form = app.collectionViews.firstMatch
         XCTAssertTrue(form.exists, app.debugDescription)
         let responseStylePicker = app.descendants(matching: .any)["ResponseStylePicker"]
-        for _ in 0..<3 where !responseStylePicker.exists {
+        for _ in 0..<5 where !responseStylePicker.isHittable {
             form.swipeUp()
         }
         XCTAssertTrue(
-            responseStylePicker.waitForExistence(timeout: 3),
+            responseStylePicker.isHittable,
             app.debugDescription
         )
-        XCTAssertTrue(
-            app.descendants(matching: .any)["SpeechLanguagePicker"].waitForExistence(timeout: 3)
-        )
+        let speechLanguagePicker = app.descendants(matching: .any)["SpeechLanguagePicker"]
+        for _ in 0..<5 where !speechLanguagePicker.isHittable {
+            form.swipeUp()
+        }
+        XCTAssertTrue(speechLanguagePicker.isHittable, app.debugDescription)
+
+        let colorThemePicker = app.descendants(matching: .any)["ColorThemePicker"]
+        for _ in 0..<5 where !colorThemePicker.isHittable {
+            form.swipeUp()
+        }
+        XCTAssertTrue(colorThemePicker.isHittable, app.debugDescription)
         XCTAssertTrue(app.buttons["Sichern"].exists)
+    }
+
+    @MainActor
+    func testCompactBottomBarRespectsVisibleBoundsAfterScrolling() throws {
+        XCUIDevice.shared.orientation = .portrait
+        try XCTSkipUnless(
+            UIDevice.current.userInterfaceIdiom == .phone,
+            "Compact bottom-bar geometry applies to iPhone."
+        )
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-AppleLanguages", "(de)", "-AppleLocale", "de_DE",
+            "--ui-test-tool-activity",
+        ]
+        app.launch()
+
+        let recordButton = app.buttons["Sprechen"]
+        let actionLabel = app.staticTexts["PrimaryActionLabel"]
+        XCTAssertTrue(recordButton.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(actionLabel.exists, app.debugDescription)
+        XCTAssertLessThan(recordButton.frame.maxY, actionLabel.frame.minY)
+        XCTAssertGreaterThanOrEqual(
+            app.frame.maxY - actionLabel.frame.maxY,
+            try bottomSafeAreaInset(in: app) - 0.5
+        )
+        let scrollingTitle = app.staticTexts["VoiceStageTitle"]
+        XCTAssertTrue(scrollingTitle.exists, app.debugDescription)
+        let initialScrollingY = scrollingTitle.frame.minY
+
+        let initial = XCTAttachment(screenshot: app.screenshot())
+        initial.name = "Compact bottom bar — first presentation"
+        initial.lifetime = .keepAlways
+        add(initial)
+
+        app.scrollViews.firstMatch.swipeUp()
+        XCTAssertLessThan(scrollingTitle.frame.minY, initialScrollingY - 2)
+        XCTAssertGreaterThanOrEqual(
+            app.frame.maxY - actionLabel.frame.maxY,
+            try bottomSafeAreaInset(in: app) - 0.5
+        )
+        let scrolled = XCTAttachment(screenshot: app.screenshot())
+        scrolled.name = "Compact bottom bar — scrolled conversation"
+        scrolled.lifetime = .keepAlways
+        add(scrolled)
+    }
+
+    @MainActor
+    func testWideBottomBarRespectsVisibleBoundsInLandscape() throws {
+        XCUIDevice.shared.orientation = .landscapeRight
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-AppleLanguages", "(de)", "-AppleLocale", "de_DE",
+            "--ui-test-tool-activity",
+        ]
+        app.launch()
+
+        let recordButton = app.buttons["Sprechen"]
+        let actionLabel = app.staticTexts["PrimaryActionLabel"]
+        XCTAssertTrue(recordButton.waitForExistence(timeout: 3), app.debugDescription)
+        XCTAssertTrue(actionLabel.exists, app.debugDescription)
+        XCTAssertLessThan(recordButton.frame.maxY, actionLabel.frame.minY)
+        XCTAssertGreaterThanOrEqual(
+            app.frame.maxY - actionLabel.frame.maxY,
+            try bottomSafeAreaInset(in: app) - 0.5
+        )
+
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Wide bottom bar — landscape"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    @MainActor
+    private func bottomSafeAreaInset(in app: XCUIApplication) throws -> CGFloat {
+        let guide = app.descendants(matching: .any)["BottomSafeAreaInset"]
+        XCTAssertTrue(guide.waitForExistence(timeout: 3), app.debugDescription)
+        let rawValue = try XCTUnwrap(guide.value as? String)
+        let inset = CGFloat(try XCTUnwrap(Double(rawValue)))
+        XCTAssertGreaterThan(inset, 0)
+        return inset
     }
 
     @MainActor

@@ -159,7 +159,9 @@ struct VoiceWorkflowTests {
         #expect(metrics.orbDiameter == 104)
         #expect(metrics.toolbarOrbDiameter == 38)
         #expect(metrics.showsInlineVoiceOrb == false)
-        #expect(metrics.recordButtonDiameter == 72)
+        #expect(metrics.recordButtonDiameter == 64)
+        #expect(metrics.brandHeaderTopPadding == 0)
+        #expect(metrics.bottomContentPadding == 0)
     }
 
     @Test func scrollsWhenAnApprovalRequestAppears() {
@@ -178,6 +180,7 @@ struct VoiceWorkflowTests {
 
         #expect(metrics.mode == .wide)
         #expect(metrics.orbDiameter == 76)
-        #expect(metrics.recordButtonDiameter == 88)
+        #expect(metrics.recordButtonDiameter == 76)
+        #expect(metrics.bottomContentPadding == 0)
     }
 }

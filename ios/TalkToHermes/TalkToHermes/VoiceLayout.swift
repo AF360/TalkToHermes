@@ -31,6 +31,8 @@ nonisolated struct VoiceLayoutMetrics: Equatable, Sendable {
     let toolbarOrbDiameter: CGFloat?
     let showsInlineVoiceOrb: Bool
     let recordButtonDiameter: CGFloat
+    let brandHeaderTopPadding: CGFloat
+    let bottomContentPadding: CGFloat
 }
 
 nonisolated enum VoiceLayout {
@@ -49,7 +51,9 @@ nonisolated enum VoiceLayout {
                 orbDiameter: 76,
                 toolbarOrbDiameter: nil,
                 showsInlineVoiceOrb: false,
-                recordButtonDiameter: 88
+                recordButtonDiameter: 76,
+                brandHeaderTopPadding: 0,
+                bottomContentPadding: 0
             )
         }
         return VoiceLayoutMetrics(
@@ -57,7 +61,9 @@ nonisolated enum VoiceLayout {
             orbDiameter: 104,
             toolbarOrbDiameter: 38,
             showsInlineVoiceOrb: false,
-            recordButtonDiameter: 72
+            recordButtonDiameter: 64,
+            brandHeaderTopPadding: 0,
+            bottomContentPadding: 0
         )
     }
 }

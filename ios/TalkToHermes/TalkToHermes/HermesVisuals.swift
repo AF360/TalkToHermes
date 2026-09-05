@@ -1,20 +1,14 @@
 import SwiftUI
 
-extension Color {
-    static let hermesGraphite = Color(red: 0.075, green: 0.078, blue: 0.09)
-    static let hermesCopper = Color(red: 0.88, green: 0.46, blue: 0.24)
-    static let hermesAmber = Color(red: 0.97, green: 0.66, blue: 0.41)
-    static let hermesCream = Color(red: 1.0, green: 0.85, blue: 0.69)
-}
-
 struct HermesBackground: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.hermesPalette) private var palette
 
     var body: some View {
         ZStack {
-            (colorScheme == .dark ? Color.hermesGraphite : Color(.systemGroupedBackground))
+            (colorScheme == .dark ? palette.background : Color(.systemGroupedBackground))
             RadialGradient(
-                colors: [Color.hermesCopper.opacity(colorScheme == .dark ? 0.20 : 0.12), .clear],
+                colors: [palette.accent.opacity(colorScheme == .dark ? 0.24 : 0.14), .clear],
                 center: .top,
                 startRadius: 20,
                 endRadius: 430
@@ -68,10 +62,11 @@ struct HermesVoiceOrb: View {
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.hermesPalette) private var palette
     @State private var pulses = false
 
     private var isActive: Bool { isRecording || isBusy || isPlaying }
-    private var accent: Color { isRecording ? .red : .hermesCopper }
+    private var accent: Color { isRecording ? .red : palette.accent }
     private var isToolbarSized: Bool { diameter < 60 }
     private var waveformSpacing: CGFloat { isToolbarSized ? 2 : 8 }
     private var waveformBarWidth: CGFloat {
@@ -91,7 +86,7 @@ struct HermesVoiceOrb: View {
             Circle()
                 .fill(
                     LinearGradient(
-                        colors: [.hermesCream, .hermesCopper],
+                        colors: [palette.highlight, palette.accent],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -110,7 +105,7 @@ struct HermesVoiceOrb: View {
             HStack(alignment: .center, spacing: waveformSpacing) {
                 ForEach(Array([0.42, 0.72, 1.0, 0.72, 0.42].enumerated()), id: \.offset) { index, factor in
                     Capsule()
-                        .fill(Color.hermesGraphite.opacity(0.94))
+                        .fill(palette.waveform.opacity(0.94))
                         .frame(
                             width: waveformBarWidth,
                             height: diameter * 0.23 * factor * (isRecording ? max(level, 0.35) : 1)

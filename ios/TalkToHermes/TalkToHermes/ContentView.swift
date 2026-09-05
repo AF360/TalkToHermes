@@ -3,6 +3,8 @@ import SwiftUI
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(SettingsStore.colorThemeKey) private var colorThemeRaw = HermesColorTheme.default.rawValue
     @StateObject private var model = VoiceViewModel()
     @State private var showsSettings = false
     @State private var showsNewConversationConfirmation = false
@@ -18,6 +20,18 @@ struct ContentView: View {
                     } else {
                         compactContent(metrics)
                     }
+#if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--ui-test-tool-activity") {
+                        Color.clear
+                            .frame(width: 1, height: 1)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Bottom safe-area inset")
+                            .accessibilityValue(
+                                String(format: "%.3f", geometry.safeAreaInsets.bottom)
+                            )
+                            .accessibilityIdentifier("BottomSafeAreaInset")
+                    }
+#endif
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
                     Group {
@@ -26,8 +40,8 @@ struct ContentView: View {
                         } else {
                             primaryControls(diameter: metrics.recordButtonDiameter)
                                 .frame(maxWidth: .infinity)
-                                .padding(.top, 12)
-                                .padding(.bottom, 8)
+                                .padding(.top, 8)
+                                .padding(.bottom, metrics.bottomContentPadding)
                         }
                     }
                     .background(.ultraThinMaterial)
@@ -36,13 +50,17 @@ struct ContentView: View {
                     }
                 }
                 .toolbarBackground(.hidden, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
                             showsNewConversationConfirmation = true
                         } label: {
                             Image(systemName: "square.and.pencil")
+                                .accessibilityIdentifier("NewConversationButton")
                         }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                         .accessibilityLabel("Neue Unterhaltung")
                         .disabled(locksNavigation)
                     }
@@ -63,7 +81,10 @@ struct ContentView: View {
                             showsSettings = true
                         } label: {
                             Image(systemName: "gearshape.fill")
+                                .accessibilityIdentifier("SettingsButton")
                         }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                         .accessibilityLabel("Einstellungen")
                         .disabled(locksNavigation)
                     }
@@ -73,10 +94,9 @@ struct ContentView: View {
                 }) {
                     SettingsView()
                 }
-                .confirmationDialog(
+                .alert(
                     "Neue Unterhaltung starten?",
-                    isPresented: $showsNewConversationConfirmation,
-                    titleVisibility: .visible
+                    isPresented: $showsNewConversationConfirmation
                 ) {
                     Button("Neue Unterhaltung", role: .destructive) {
                         handleNewConversation(.confirm)
@@ -105,7 +125,8 @@ struct ContentView: View {
                 .animation(reduceMotion ? nil : .snappy, value: model.approvalRequired)
             }
         }
-        .tint(.hermesCopper)
+        .tint(palette.controlAccent(for: colorScheme))
+        .environment(\.hermesPalette, palette)
     }
 
     private func compactContent(_ metrics: VoiceLayoutMetrics) -> some View {
@@ -114,7 +135,7 @@ struct ContentView: View {
                 brandHeader
                     .frame(maxWidth: 680)
                     .padding(.horizontal, 16)
-                    .padding(.top, 4)
+                    .padding(.top, metrics.brandHeaderTopPadding)
                     .padding(.bottom, 8)
             }
 
@@ -193,8 +214,8 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 28)
-        .padding(.top, 10)
-        .padding(.bottom, 8)
+        .padding(.top, 12)
+        .padding(.bottom, metrics.bottomContentPadding)
     }
 
     private func wideVoiceStatus(_ metrics: VoiceLayoutMetrics) -> some View {
@@ -300,6 +321,7 @@ struct ContentView: View {
             Text("TalkToHermes")
                 .font(.title2.weight(.bold))
                 .tracking(-0.4)
+                .accessibilityIdentifier("BrandTitle")
             Text(String(format: String(localized: "Mit %@ sprechen"), model.assistantName))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -322,6 +344,7 @@ struct ContentView: View {
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .contentTransition(.numericText())
+                .accessibilityIdentifier("VoiceStageTitle")
 
             Text(stageSubtitle)
                 .font(.subheadline)
@@ -372,7 +395,7 @@ struct ContentView: View {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "waveform.and.mic")
                     .font(.title2)
-                    .foregroundStyle(Color.hermesCopper)
+                    .foregroundStyle(palette.controlAccent(for: colorScheme))
                     .frame(width: 32)
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Natürlich sprechen")
@@ -405,7 +428,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 15) {
                 Label("Freigabe erforderlich", systemImage: "checkmark.shield.fill")
                     .font(.headline)
-                    .foregroundStyle(Color.hermesCopper)
+                    .foregroundStyle(palette.normalForeground(for: colorScheme))
                 Text(
                     String(
                         format: String(localized: "%@ möchte eine Aktion ausführen. Die Freigabe gilt nur für diesen Vorgang."),
@@ -457,16 +480,16 @@ struct ContentView: View {
     }
 
     private func primaryControls(diameter: CGFloat) -> some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 8) {
             Button {
                 model.toggleRecording()
             } label: {
                 ZStack {
                     Circle()
-                        .fill(model.recorder.isRecording ? Color.red : Color.hermesCopper)
+                        .fill(model.recorder.isRecording ? Color.red : palette.controlAccent(for: colorScheme))
                         .frame(width: diameter, height: diameter)
                         .shadow(
-                            color: (model.recorder.isRecording ? Color.red : Color.hermesCopper).opacity(0.32),
+                            color: (model.recorder.isRecording ? Color.red : palette.controlAccent(for: colorScheme)).opacity(0.32),
                             radius: 18,
                             y: 8
                         )
@@ -476,7 +499,11 @@ struct ContentView: View {
                     } else {
                         Image(systemName: model.recorder.isRecording ? "stop.fill" : "mic.fill")
                             .font(.system(size: diameter * 0.34, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(
+                                model.recorder.isRecording || colorScheme == .light
+                                    ? Color.white
+                                    : palette.foregroundOnAccent
+                            )
                     }
                 }
             }
@@ -488,6 +515,7 @@ struct ContentView: View {
             Text(primaryActionLabel)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(model.canSpeak || model.recorder.isRecording ? .primary : .secondary)
+                .accessibilityIdentifier("PrimaryActionLabel")
 
             if model.canCancel {
                 Button(role: .destructive) {
@@ -499,6 +527,14 @@ struct ContentView: View {
             }
         }
         .padding(.top, 2)
+    }
+
+    private var colorTheme: HermesColorTheme {
+        HermesColorTheme(rawValue: colorThemeRaw) ?? .default
+    }
+
+    private var palette: HermesPalette {
+        colorTheme.palette
     }
 }
 

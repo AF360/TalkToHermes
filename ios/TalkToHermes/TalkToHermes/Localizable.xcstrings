@@ -1164,7 +1164,12 @@
     "Risiko" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Risk"}}}},
     "Status" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Status"}}}},
     "Tool-Aufruf %d" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Tool call %d"}}}},
-    "Zeigt sichere Details zu diesem Tool-Aufruf." : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Shows safe details for this tool call."}}}}
+    "Zeigt sichere Details zu diesem Tool-Aufruf." : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Shows safe details for this tool call."}}}},
+    "Darstellung" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Appearance"}}}},
+    "Farbschema" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Color theme"}}}},
+    "Moosige Höhle" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Mossy Hollow"}}}},
+    "Schokoladentrüffel" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Chocolate Truffle"}}}},
+    "Stürmischer Morgen" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Stormy Morning"}}}}
   },
   "version" : "1.0"
 }

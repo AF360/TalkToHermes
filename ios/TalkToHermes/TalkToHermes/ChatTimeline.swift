@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ChatTimeline: View {
+    @Environment(\.hermesPalette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
     let exchanges: [ChatExchange]
     let hasPlayableResponse: Bool
     let isPlaying: Bool
@@ -25,11 +27,11 @@ struct ChatTimeline: View {
             Text(userText)
                 .font(.body)
                 .textSelection(.enabled)
-                .foregroundStyle(Color.hermesGraphite)
+                .foregroundStyle(palette.foregroundOnAccent)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
                 .background(
-                    Color.hermesCopper,
+                    palette.messageBackground,
                     in: RoundedRectangle(cornerRadius: 19, style: .continuous)
                 )
                 .accessibilityIdentifier("ChatUserBubble-\(id)")
@@ -43,7 +45,7 @@ struct ChatTimeline: View {
                 VStack(alignment: .leading, spacing: 9) {
                     Text(exchange.assistantName)
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(Color.hermesCopper)
+                        .foregroundStyle(palette.normalForeground(for: colorScheme))
                     if !exchange.toolInvocations.isEmpty {
                         toolInvocationBadges(
                             exchange.toolInvocations,
@@ -108,7 +110,7 @@ struct ChatTimeline: View {
         Circle()
             .fill(
                 LinearGradient(
-                    colors: [.hermesCream, .hermesCopper],
+                    colors: [palette.highlight, palette.accent],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -117,7 +119,7 @@ struct ChatTimeline: View {
             .overlay {
                 Text(String(assistantName.prefix(1)).uppercased())
                     .font(.headline.weight(.bold))
-                    .foregroundStyle(Color.hermesGraphite)
+                    .foregroundStyle(palette.background)
             }
             .accessibilityHidden(true)
     }
@@ -156,6 +158,8 @@ struct ChatTimeline: View {
 }
 
 private struct ToolInvocationBadge: View {
+    @Environment(\.hermesPalette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
     let invocation: ChatToolInvocation
     let ordinal: Int
     let accessibilityID: String
@@ -178,9 +182,9 @@ private struct ToolInvocationBadge: View {
                     .frame(width: 34, height: 34)
                 Text("\(ordinal)")
                     .font(.system(size: 8, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.hermesGraphite)
+                    .foregroundStyle(palette.background)
                     .frame(minWidth: 13, minHeight: 13)
-                    .background(Color.hermesAmber, in: Circle())
+                    .background(palette.highlight, in: Circle())
                     .offset(x: 4, y: -4)
             }
             .frame(
@@ -204,7 +208,7 @@ private struct ToolInvocationBadge: View {
         }
     }
 
-    private var badgeColor: Color { .hermesAmber }
+    private var badgeColor: Color { palette.controlAccent(for: colorScheme) }
 
     private var toolIcon: String {
         let lowered = invocation.name.lowercased()
@@ -217,6 +221,8 @@ private struct ToolInvocationBadge: View {
 }
 
 private struct ToolInvocationPopover: View {
+    @Environment(\.hermesPalette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
     let invocation: ChatToolInvocation
     let ordinal: Int
     @Environment(\.locale) private var locale
@@ -226,7 +232,7 @@ private struct ToolInvocationPopover: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
                     Image(systemName: "hammer.fill")
-                        .foregroundStyle(Color.hermesAmber)
+                        .foregroundStyle(palette.controlAccent(for: colorScheme))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ChatToolName.display(invocation.name))
                             .font(.headline)

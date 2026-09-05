@@ -40,6 +40,24 @@ final class VoiceViewModel: ObservableObject {
         if ProcessInfo.processInfo.arguments.contains("--ui-test-tool-activity") {
             chatHistory = ChatHistory(exchanges: [
                 ChatExchange(
+                    id: "ui-scroll-probe-1",
+                    userText: "Fasse die wichtigsten Punkte für den Testverlauf zusammen.",
+                    assistantText: String(
+                        repeating: "Dieser längere Testeintrag macht die Unterhaltung zuverlässig scrollbar. ",
+                        count: 5
+                    ),
+                    assistantName: "Hermes"
+                ),
+                ChatExchange(
+                    id: "ui-scroll-probe-2",
+                    userText: "Ergänze einen zweiten Abschnitt.",
+                    assistantText: String(
+                        repeating: "Auch dieser Inhalt gehört ausschließlich zum lokalen UI-Test. ",
+                        count: 5
+                    ),
+                    assistantName: "Hermes"
+                ),
+                ChatExchange(
                     id: "ui-tool-turn",
                     userText: "Öffne das Projekt und prüfe das Wetter.",
                     assistantText: "Beide Tool-Aufrufe sind abgeschlossen.",
