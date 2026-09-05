@@ -2,7 +2,7 @@
 
 Dieses Verzeichnis ist ein vom Betreiber zu prüfendes Beispiel, kein Installer. Es nimmt selbst keine Produktivänderungen vor. Jede Instanz besteht aus einem vorhandenen Unix-Konto, einem Loopback-Bridge-Port, zwei Bridge-Credentials plus Tokens konfigurierter Remote-Provider und einem SQLite-State-Verzeichnis. Niemals zwei Bridge-Prozesse gegen dasselbe State-Verzeichnis betreiben.
 
-Die Bridge bleibt ein systemd-Service; Caddy bleibt das bestehende Docker-Deployment. Das Beispiel installiert bewusst kein systemd-Caddy, ersetzt kein vollständiges Caddyfile und fügt weder Cloud-Tunnel noch öffentlichen Proxy hinzu.
+Die Beispiele betreiben die Bridge als systemd-Service und integrieren sie in ein vom Betreiber verwaltetes Caddy-Deployment. Sie installieren bewusst kein Caddy, ersetzen kein vollständiges Caddyfile und fügen weder Cloud-Tunnel noch öffentlichen Proxy hinzu.
 
 ## Voraussetzungen
 
@@ -10,7 +10,7 @@ Dieses Repository bootstrapped keinen Host. Betriebssystem-, Hermes-, Voice-Runt
 
 ### Bridge-Host
 
-Benötigt werden Debian mit systemd-User-Services, ein dediziertes Unix-Konto pro Instanz, `systemctl --user`, `systemd-analyze`, bei Bedarf Linger sowie `git`, `curl`, `ca-certificates`, `coreutils`, `iproute2` und eine geprüfte `uv`-Installation. Bridge-Abhängigkeiten aus `backend/uv.lock` mit `uv sync --frozen` installieren. Hermes Agent muss je Instanz bereits installiert und auf Loopback gesund sein. TalkToHermes installiert/ersetzt weder Hermes noch Telegram-Gateway. Zusätzlich: geprüfter Checkout, private Konfiguration/Secrets, State-Verzeichnis `0700` und private Caddy-PKI.
+Benötigt werden Debian mit systemd-User-Services, ein dediziertes Unix-Konto pro Instanz, `systemctl --user`, `systemd-analyze`, bei Bedarf Linger sowie `git`, `curl`, `ca-certificates`, `coreutils`, `iproute2` und eine geprüfte `uv`-Installation. Bridge-Abhängigkeiten aus `backend/uv.lock` mit `uv sync --frozen` installieren. Hermes Agent muss je Instanz bereits installiert und auf Loopback gesund sein. TalkToHermes installiert oder ersetzt weder Hermes noch andere konfigurierte Gateways. Zusätzlich: geprüfter Checkout, private Konfiguration/Secrets, State-Verzeichnis `0700` und private Caddy-PKI.
 
 ### Voice-Provider
 
@@ -20,11 +20,11 @@ Keine zweite CUDA-Installation über eine funktionierende geprüfte Umgebung leg
 
 ## Deployment-Skripte
 
-- `deployment/scripts/deploy-hermes-agent-user.sh INSTANCE [REVISION]`: als unprivilegierter Bridge-User; erstellt unveränderliches Git-Archiv-Release, installiert User-Unit, startet Bridge neu und prüft Loopback-Health.
-- `deployment/scripts/deploy-primary-voice-server-user-services.sh [REPOSITORY_ROOT] [VOICE_HOST_IP] [REVISION]`: deployt STT und OmniVoice aus einem Commit auf dem GPU-Host und prüft beide Health-Endpunkte.
+- `deployment/scripts/deploy-hermes-agent-user.sh INSTANCE [REVISION] [CANDIDATE_CONFIG]`: als unprivilegierter Bridge-User; erstellt ein unveränderliches Git-Archiv-Release, validiert und installiert optional eine private Kandidaten-YAML innerhalb derselben Rollback-Transaktion, installiert die User-Unit, startet die Bridge neu und prüft Health sowie den authentifizierten Statusvertrag.
+- `deployment/scripts/deploy-primary-voice-server-user-services.sh [REPOSITORY_ROOT] [VOICE_HOST_IP] [REVISION]`: deployt STT und OmniVoice aus einem Commit auf dem GPU-Host und prüft beide authentifizierten Readiness-Endpunkte.
 - `deployment/scripts/deploy-fallback-piper-user.sh INSTANCE VOICE PORT BIND_IP [SERVER_ROOT]`: installiert auf macOS launchd-Agent und warmen Piper-Supervisor, validiert Modell/Port, wärmt Synthese auf und rollt bei Fehler zurück.
 
-Legacy-Root-Daemons werden nicht automatisch deaktiviert; deren Stilllegung ist ein getrennt geprüfter privilegierter Schritt.
+Das Skript für den primären Voice-Server erwartet die OmniVoice-Umgebung unter `~/.local/opt/talktohermes-omnivoice/venv`, Konfiguration und Token unter `~/.config/talktohermes-omnivoice/`, den STT-Token unter `~/.config/talktohermes-stt/` sowie die geprüfte STT-Runtime unter `/opt/stt/.venv`. Paketquellen werden unter den jeweiligen `~/.local/opt/.../current`-Bäumen installiert. Vor Abschluss der Transaktion müssen beide authentifizierten `/ready`-Gates und die unauthentifizierten `401`-Prüfungen erfolgreich sein.
 
 ## Bevorzugte Bridge-User-Service-Installation
 
@@ -39,23 +39,25 @@ cp deployment/config/instance.secrets.example \
 chmod 0600 "$HOME/.config/talktohermes/$INSTANCE.secrets"
 ```
 
-Alle `INSTANCE`-Literale ersetzen, Provider/Loopback-Port setzen und unabhängige Secrets in die `0600`-Datei eintragen. Keine Credentials in YAML oder argv.
+Alle `INSTANCE`-Literale ersetzen, den ausdrücklich serverseitigen `assistant_name`, Provider und Loopback-Port setzen und unabhängige Secrets in die `0600`-Datei eintragen. Keine Credentials in YAML oder argv.
 
 ```sh
-deployment/scripts/deploy-hermes-agent-user.sh "$INSTANCE" REVISION
+deployment/scripts/deploy-hermes-agent-user.sh "$INSTANCE" REVISION /absoluter/pfad/zur/kandidaten.yaml
 systemctl --user is-enabled "talktohermes@$INSTANCE.service"
 systemctl --user is-active "talktohermes@$INSTANCE.service"
 ```
 
-Für Start ohne Login einmalig `loginctl enable-linger INSTANCE`. Die User-Unit verzichtet bewusst auf problematische Mount-Namespace-/cgroup-IP-Firewall-Direktiven eines unprivilegierten User-Managers; die übrigen Einschränkungen bleiben aktiv. Legacy-System-Service-Pfade unter `/opt`, `/etc`, `/var/lib` nicht mit dem User-Service-Layout mischen.
+Den Kandidatenpfad weglassen, wenn die Konfiguration unverändert bleibt. Ist er angegeben, muss er eine reguläre, dem aktuellen Benutzer gehörende absolute Datei sein. Das Skript validiert sie mit dem Kandidaten-Release, installiert sie als Modus `0600` und stellt bei einem späteren Fehler die vollständige vorherige YAML wieder her, bevor es den vorherigen Code neu startet.
+
+Für Start ohne Login einmalig `loginctl enable-linger INSTANCE`. Die User-Unit verzichtet auf Mount-Namespace-/cgroup-IP-Firewall-Direktiven, die in einem unprivilegierten User-Manager nicht verfügbar oder unzuverlässig sind. Bridge und Hermes bleiben auf Loopback; Remote-Provider-Zugriff wird an Proxy und Host-Firewall begrenzt. Pfade der alternativen System-Service-Installation unter `/opt`, `/etc` und `/var/lib` nicht mit dem User-Service-Layout mischen.
 
 ## Invarianten und Annahmen
 
-Instanzname ist ein bestehendes dediziertes Unix-Konto und gültige `instance_id`. Legacy-Releases und `current` sind root-owned. YAML enthält keine Credentials; Secret-Dateien sind `0600`; State-Verzeichnis ist `0700` und wird nie geteilt. Hermes bleibt auf `127.0.0.1:8642`, die Bridge ebenfalls auf Loopback. `hermes.voice_instructions` ist begrenzt, nicht geheim und sprachbezogen; Clients dürfen nur `short`, `normal`, `detailed` wählen.
+Instanzname ist ein bestehendes dediziertes Unix-Konto und gültige `instance_id`. Bei der alternativen System-Service-Installation sind Releases und `current` root-owned. YAML enthält keine Credentials; Secret-Dateien sind `0600`; State-Verzeichnis ist `0700` und wird nie geteilt. Hermes bleibt auf `127.0.0.1:8642`, die Bridge ebenfalls auf Loopback. `assistant_name` ist ausdrücklich zu konfigurieren. `hermes.voice_instructions` ist begrenzt, nicht geheim und sprachbezogen; Clients dürfen nur `short`, `normal`, `detailed` wählen.
 
 Provider-Reihenfolge kommt direkt aus `stt`/`tts`. Remote-HTTPS-Provider besitzen getrennte Connect-, Response- und Circuit-Cooldown-Werte (Standard 0,5 s / 120 s / 45 s). Die Bridge nutzt echte TCP/TLS-Requests statt ICMP-Ping und überspringt während Cooldown nicht erreichbare Endpunkte; danach wird genau ein Half-open-Versuch zugelassen. Doppelte Remote-Endpunkte sind verboten. `text_retention_hours` ist maximal 24; Bereinigung wird deadline-orientiert geplant und bei transienten Fehlern erneut versucht.
 
-Dokumentations-LAN: `192.168.100.10` Hermes, `.20` primärer Voice-Server, optional `.30` Fallback. Diese Werte sind nur Beispiele. Ein öffentlicher HTTPS-Port wird genau einem Loopback-Bridge-Port zugeordnet; kein HTTP-Listener.
+Dokumentations-LAN: `192.168.100.10` Hermes, `.20` primärer Voice-Server, optional `.30` Fallback. Diese Werte sind nur Beispiele. Ein clientseitig erreichbarer privater HTTPS-Port wird genau einem Loopback-Bridge-Port zugeordnet; kein HTTP-Listener.
 
 ## Minimale privilegierte Befehle
 
@@ -70,7 +72,7 @@ ss -ltnp 'sport = :8443'
 
 Bei Neuinstallation müssen beide frei sein. Beim Upgrade darf nur der bekannte TalkToHermes-Service den Bridge-Port besitzen. Außerdem Abgrenzung zu Hermes `8642`, Caddy `80/443` und Caddy-Admin `2019` prüfen.
 
-## Legacy-Root/System-Service-Installation
+## Alternative root-eigene System-Service-Installation
 
 Geprüfte Revision zunächst unprivilegiert testen (`pytest`, `uv lock --check`). Danach als Administrator ein unveränderliches Git-Archiv unter `/opt/talktohermes/releases/REVISION` mit expliziter sicherer tar-umask bereitstellen, `uv sync --frozen --no-dev --no-editable` ausführen, Eigentümer root setzen und `current` atomar umschalten. Keine Entwickler-`.venv` kopieren und keine unbeschränkte Dependency-Auflösung verwenden.
 
@@ -82,11 +84,11 @@ Nur bei `type: wyoming` erforderlich. Wrapper und exakt geprüfte `wyoming`-Vers
 
 Die System-Unit bleibt standardmäßig fail-closed (`IPAddressDeny=any` plus Loopback). Site-lokale DNS-/Provider-IP-Adressen müssen in einem geprüften Instanz-Drop-in explizit erlaubt werden. Platzhalter, fehlende oder zusätzliche Adressen, fehlgeschlagene DNS-Auflösung oder Provider-Erreichbarkeit blockieren die Aktivierung.
 
-## Bestehende Docker-Caddy-Integration
+## Docker-Caddy-Integration
 
-Produktionsroot ist `/opt/caddy`, Host-Networking sowie persistente `/data`-/`/config`-Volumes bleiben erhalten. Bestehenden Container-/Image-Namen nicht im Rahmen dieses Deployments umbenennen. Standard-HTTPS proxyt nur zum authentifizierten Dashboard; die private Hermes API auf `127.0.0.1:8642` wird nie exponiert. TalkToHermes erhält eine separate Route, z. B. `8443 -> 127.0.0.1:18081`.
+`caddy/compose.example.yaml` und `caddy/Caddyfile.merged.example` sind Fragmente für ein vom Betreiber verwaltetes Deployment, keine vollständigen Ersatzdateien. Dokumentations-Platzhalter ersetzen, unabhängige Routen und persistente Caddy-Daten bewahren und die Hermes API auf Loopback halten. Das Beispiel ordnet privates HTTPS `8443` der TalkToHermes-Bridge auf `127.0.0.1:18081` zu; Ports und Hostname sind an das Zielsystem anzupassen.
 
-Compose und Caddyfile immer zusammenführen, niemals blind ersetzen. Bestehende Hermes-Routen und Storage beibehalten. `home.arpa` nutzt `tls internal` und benötigt keinen DNS-Provider-Secret-Mount. Vollständige Konfiguration vor Neustart mit Caddy validieren und danach beide Routen ohne `curl -k` prüfen.
+Compose und Caddyfile immer zusammenführen, niemals blind ersetzen. `home.arpa` nutzt `tls internal` und benötigt keinen DNS-Provider-Secret-Mount. Vollständige Konfiguration vor Neustart mit Caddy validieren und danach die TalkToHermes-Health-Route ohne `curl -k` prüfen. Die tatsächlichen Service- und Container-Namen des Zielsystems verwenden; dieses Repository setzt keine voraus.
 
 ### Interne CA des primären Voice-Servers auf dem Bridge-Host vertrauen
 
@@ -98,15 +100,15 @@ Nur `/data/caddy/pki/authorities/local/root.crt` exportieren. Fingerprint getren
 
 ## Validierungs- und Auth-Gates
 
-Listener, Service-Status und begrenzte Journals prüfen. Ohne Token und mit falschem Token muss `/v1/status` `401`, mit Instanz-Token `200` liefern. Reale Tokens nicht in argv setzen, sondern geschützte temporäre curl-Konfiguration verwenden. Den authentifizierten Request anschließend über den öffentlichen privaten HTTPS-Port wiederholen und Zertifikatskette/Hostname ohne `-k` prüfen.
+Listener, Service-Status und begrenzte Journals prüfen. Ohne Token und mit falschem Token muss `/v1/status` `401`, mit Instanz-Token `200` liefern. Reale Tokens nicht in argv setzen, sondern geschützte temporäre curl-Konfiguration verwenden. Den authentifizierten Request anschließend über den LAN-seitigen privaten HTTPS-Port wiederholen und Zertifikatskette/Hostname ohne `-k` prüfen.
 
 ### Cross-Token-Isolation
 
-Bei zwei Instanzen muss Token A nur auf A `200` und auf B `401` liefern, umgekehrt ebenso. YAML-Ports, Secret-Dateien, State-Verzeichnisse, SQLite-Dateien, Hermes-Roots/Profile und öffentliche HTTPS-Ports müssen verschieden sein. Abschließend repräsentativen Create/Voice/Status/Audio-Flow über HTTPS ausführen und prüfen, dass nur das richtige Hermes-Profil eine Session erhält und Telegram/Hermes unverändert funktioniert.
+Bei zwei Instanzen muss Token A nur auf A `200` und auf B `401` liefern, umgekehrt ebenso. YAML-Ports, Secret-Dateien, State-Verzeichnisse, SQLite-Dateien, Hermes-Roots/Profile und LAN-seitige private HTTPS-Ports müssen verschieden sein. Abschließend repräsentativen Create/Voice/Status/Audio-Flow über HTTPS ausführen und prüfen, dass nur das richtige Hermes-Profil eine Session erhält und andere Hermes-Clients unverändert funktionieren.
 
 ## Upgrade
 
-Neues unveränderliches Release vollständig testen, Port-Eigentümer erneut prüfen, Release bereitstellen und `current` atomar umschalten. Einen bereits aktiven Service ausdrücklich neu starten. Danach Health, Auth, HTTPS, Voice-Flow, Telegram-Erhalt und Cross-Token-Prüfungen wiederholen. Caddy-Image nur bei Bedarf und mit getrennt geprüften Pins aktualisieren.
+Neues unveränderliches Release vollständig testen, Port-Eigentümer erneut prüfen, Release bereitstellen und `current` atomar umschalten. Einen bereits aktiven Service ausdrücklich neu starten. Danach Health, Auth, HTTPS, Voice-Flow, Erhalt anderer Hermes-Clients und Cross-Token-Prüfungen wiederholen. Caddy-Image nur bei Bedarf und mit getrennt geprüften Pins aktualisieren.
 
 ## Rollback
 

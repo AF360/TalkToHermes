@@ -22,13 +22,13 @@ In der App **Einstellungen** öffnen und die vom Bridge-Administrator bereitgest
 
 Unter **Server** ausschließlich den Hostnamen eingeben. Nicht `https://`, einen Port, URL-Credentials, Pfad, Query-String oder Fragment eingeben. Die App entfernt Leerraum, wandelt den Hostnamen in Kleinbuchstaben um, entfernt einen abschließenden Punkt und validiert jedes DNS-Label. HTTPS ist fest vorgegeben und kann nicht deaktiviert werden.
 
-Beim Tippen auf **Sichern** ruft die App zunächst authentifiziert `GET /v1/status` auf. Normalisierter Server, Port, Antwortstil, gesprochene Sprache und Keychain-Token werden erst übernommen, wenn die Bridge einen bereiten Status meldet. Die authentifizierte Antwort liefert außerdem die von der App angezeigte Instanzidentität.
+Beim Tippen auf **Sichern** ruft die App zunächst authentifiziert `GET /v1/status` auf. Normalisierter Server, Port, Antwortstil, gesprochene Sprache und Keychain-Token werden erst übernommen, wenn die Bridge einen bereiten Status meldet. Die authentifizierte Antwort liefert außerdem die von der App verwendete Instanz-ID und den sichtbaren Assistentennamen.
 
 Host und Port werden in den App-Einstellungen gespeichert. Der Bearer-Token wird getrennt in der Keychain mit `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` gespeichert; er liegt niemals in Einstellungen oder Quellcode.
 
 ## Sprachen
 
-Die App enthält deutsche und englische Lokalisierungen. iOS stellt nach der Installation die normale Sprachauswahl pro App bereit. App-Sprache und gesprochene Sprache sind unabhängig: **Einstellungen → Konversation → Gesprochene Sprache** wählt `Deutsch (de)` oder `Englisch (en)` für nachfolgende Voice-Turns. Bestehende Installationen ohne gültige Einstellung für die gesprochene Sprache verwenden standardmäßig Deutsch; die App leitet die Sprache eines Voice-Turns niemals aus Gerätere­gion oder UI-Lokalisierung ab.
+Die App enthält deutsche und englische Lokalisierungen. iOS stellt nach der Installation die normale Sprachauswahl pro App bereit. App-Sprache und gesprochene Sprache sind unabhängig: **Einstellungen → Konversation → Gesprochene Sprache** wählt `Deutsch (de)` oder `Englisch (en)` für nachfolgende Voice-Turns. Bestehende Installationen ohne gültige Einstellung für die gesprochene Sprache verwenden standardmäßig Deutsch; die App leitet die Sprache eines Voice-Turns niemals aus Geräteregion oder UI-Lokalisierung ab.
 
 ## Sicherheit von Endpunkt und Token
 

@@ -1,6 +1,6 @@
 # TalkToHermes
 
-![TalkToHermes](/images/TalkToHermes.png)
+![TalkToHermes](images/TalkToHermes.png)
 
 Privates natives Sprach- und optionales Text-Frontend für einen Hermes-Agenten auf iPhone und iPad.
 
@@ -29,7 +29,7 @@ Die Listenreihenfolge ist die Fallback-Reihenfolge. Wird ein optionaler mittlere
 
 ## Status
 
-Bridge und nativer Sprachpfad implementieren begrenzten privaten Upload, STT-Fallback, offizielle Hermes Run/SSE/Approval/Cancel-Funktionen, qualitätsorchestriertes TTS für die vollständige Antwort, authentifizierte Audio-Auslieferung, Wiederherstellung nach Neustart und begrenzte Aufbewahrung. Die Beispiele für dediziertes STT (`9444`) und OmniVoice (`9443`) verwenden authentifiziertes TLS auf `primary-voice-server.home.arpa`; der ältere gemeinsam genutzte STT-Listener auf `5005` ist kein TalkToHermes-Produktionsziel. Der SwiftUI-Client bietet Keychain-gestützte Authentifizierung, transaktionale Einstellungen, Wiederholen/Stoppen und Aufzeichnung mit Tap-to-Interrupt. Der authentifizierte Bridge-Status liefert dem Client die konfigurierte Instanzidentität. Ein begrenztes, vom Betreiber konfigurierbares Voice-Overlay bewahrt die ausgewählte Hermes-Identität und den Safety-Prompt, während der Client ausschließlich `short`, `normal` oder `detailed` auswählen kann.
+Bridge und nativer Sprachpfad implementieren begrenzten privaten Upload, STT-Fallback, offizielle Hermes Run/SSE/Approval/Cancel-Funktionen, qualitätsorchestriertes TTS für die vollständige Antwort, authentifizierte Audio-Auslieferung, Wiederherstellung nach Neustart und begrenzte Aufbewahrung. Die Beispiele für dediziertes STT (`9444`) und OmniVoice (`9443`) verwenden authentifiziertes TLS auf `primary-voice-server.home.arpa`. Der SwiftUI-Client bietet Keychain-gestützte Authentifizierung, transaktionale Einstellungen, Wiederholen/Stoppen und Aufzeichnung mit Tap-to-Interrupt. Der authentifizierte Bridge-Status liefert dem Client die konfigurierte Instanz-ID und den sichtbaren Assistentennamen. Ein begrenztes, vom Betreiber konfigurierbares Voice-Overlay bewahrt die ausgewählte Hermes-Identität und den Safety-Prompt, während der Client ausschließlich `short`, `normal` oder `detailed` auswählen kann.
 
 ## Maßgebliche Dokumente
 

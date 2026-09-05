@@ -1,6 +1,6 @@
 # TalkToHermes-Architektur
 
-![TalkToHermes architecture](/images/TalkToHermes-architecture_DE.png)
+![TalkToHermes architecture](../images/TalkToHermes-architecture_DE.png)
 
 ## Ziel
 
@@ -11,6 +11,8 @@ TalkToHermes ist ein privates natives Push-to-Talk-Frontend für iPhone/iPad fü
 Hermes stellt bereits Sprachaufzeichnung, VAD, satzbewusstes TTS, lokale STT-Wiederherstellung, Piper, OpenAI-kompatibles TTS, Sessions, Runs, SSE, Stop und Freigaben bereit. TalkToHermes ergänzt nur den fehlenden mobilen Client, eine schmale LAN-Grenze, Provider-Richtlinien, Aufbewahrung und OmniVoice-Qualitätsprüfungen. Die breite Desktop-/Dashboard-API wird iOS nicht zugänglich gemacht; insbesondere erhält die App keinen Dashboard-Token und kann `/api/ws` oder `/api/audio/*` nicht direkt aufrufen.
 
 ## Komponententopologie
+
+Das Diagramm verwendet reservierte `home.arpa`-Namen und RFC-1918-Adressen als austauschbare Dokumentationsbeispiele; sie sind keine in TalkToHermes einkompilierten Installationsendpunkte.
 
 ```text
 iPhone/iPad
@@ -40,17 +42,19 @@ Jeder Mensch erhält einen eigenen Prozess, keinen Profilparameter eines gemeins
 1. iOS erreicht nur seine schmale Voice-Bridge-Instanz.
 2. Jeder Hermes API Server bleibt Loopback-only und hat einen eigenen Key.
 3. App-Token und Hermes-Key sind pro Instanz unterschiedliche Credentials.
-4. Wyoming, Coglet, OmniVoice, Piper, Hermes API und `hermes serve` werden nie direkt gegenüber iOS exponiert.
+4. Konfigurierte STT-/TTS-Backends, Hermes API und `hermes serve` werden nie direkt gegenüber iOS exponiert.
 5. Keine Router-Weiterleitung, kein öffentlicher Tunnel, kein Cloud-Proxy.
 6. Caddy stellt `home.arpa`-Zertifikate über private PKI (`tls internal`) aus; verwaltete iOS-Clients vertrauen der per Fingerprint geprüften internen Root-CA ausdrücklich.
 
 ## Session-Modell
 
-Eine TalkToHermes-Konversation wird einer dedizierten Hermes-Session im konfigurierten Benutzerprofil zugeordnet. Die Zuordnung liegt serverseitig; Hermes-Session-IDs werden nicht exponiert. TalkToHermes-Konversationen werden nicht mit Telegram-Transkripten zusammengeführt. Hermes bleibt der längerlebige kanonische Kontext; das Löschen einer TalkToHermes-Konversation entfernt lokale Zuordnung/Artefakte, derzeit aber nicht die Hermes-Session.
+Eine TalkToHermes-Konversation wird einer dedizierten Hermes-Session im konfigurierten Benutzerprofil zugeordnet. Die Zuordnung liegt serverseitig; Hermes-Session-IDs werden nicht exponiert. TalkToHermes-Konversationen werden nicht mit Gesprächen anderer Hermes-Clients zusammengeführt. Hermes bleibt der längerlebige kanonische Kontext; das Löschen einer TalkToHermes-Konversation entfernt lokale Zuordnung/Artefakte, derzeit aber nicht die Hermes-Session.
 
-Vor jedem Run liest die Bridge `/api/sessions/{id}/messages` und übergibt diese kanonische Historie als `conversation_history` zusammen mit derselben `session_id` an `/v1/runs`. Dies ist nötig, weil Runs zwar persistieren, vorherigen Session-Kontext derzeit aber nicht automatisch fortsetzen, während Session-Chat-Streaming keine geeignete Run-Approval-Session besitzt. Die Bridge führt keinen zweiten Historien-Speicher.
+Vor jedem Run liest die Bridge `/api/sessions/{id}/messages` und übergibt diese kanonische Historie als `conversation_history` zusammen mit derselben `session_id` an `/v1/runs`. Dies ist nötig, weil Runs Nachrichten persistieren, vorherigen Session-Kontext aber nicht automatisch fortsetzen, während Session-Chat-Streaming nicht den von der Bridge benötigten Freigabe-Lebenszyklus bereitstellt. Die Bridge führt keinen zweiten Historien-Speicher.
 
-Jeder Run erhält zusätzlich ein begrenztes, vom Betreiber konfigurierbares `hermes.voice_instructions`-Overlay. Es bewahrt Hermes-Profil, Identität, Memory, Tools und Safety-Prompt und formt nur die gesprochene Ausgabe. Der Client darf ausschließlich `short`, `normal` oder `detailed` wählen; freie System-Prompt-Texte sind nicht möglich. Der authentifizierte Status liefert `instance_id`, aus der der native Client den sichtbaren Assistentennamen ableitet.
+Jeder Run erhält zusätzlich ein begrenztes, vom Betreiber konfigurierbares `hermes.voice_instructions`-Overlay. Es bewahrt Hermes-Profil, Identität, Memory, Tools und Safety-Prompt und formt nur die gesprochene Ausgabe. Der Client darf ausschließlich `short`, `normal` oder `detailed` wählen; freie System-Prompt-Texte sind nicht möglich. Der authentifizierte Status liefert `instance_id` und den ausdrücklich serverseitig konfigurierten `assistant_name`. Der native Client zeigt diesen Namen an und behandelt Endpunkt, Instanz-ID und Assistentenname gemeinsam als Bridge-Identität.
+
+Tool-Aktivität wird als Fail-Closed-Metadaten pro Aufruf behandelt. Jedes gültige `tool.started`-Event der vertrauenswürdigen Hermes Runs API erzeugt genau einen stabilen Marker; rohe Hermes-Tool-IDs bleiben dabei unverändert. Der iOS-Client formatiert sie nur für die Anzeige. Die Bridge speichert ausschließlich den festen Status `invoked`, Startzeit und konservativ zugeordnete Freigabe-/Risikometadaten. Laufzeit-Previews, Argumente, Ergebnisse, Pfade, Prompts und fehlerhafte IDs werden verworfen. Optionale `tool_summaries` sind begrenzte, statisch konfigurierte Beschreibungen und werden erst bei REST-/SSE-Ausgabe ergänzt. Wiederholte Aufrufe werden nicht dedupliziert. Abschlussstatus und Laufzeit fehlen bewusst, solange Hermes keinen stabilen Call-Identifier für die sichere Zuordnung paralleler gleichnamiger Aufrufe liefert.
 
 ## Hermes Voice Worker
 
@@ -64,7 +68,7 @@ omnivoice   -> text_to_speech_tool(provider="openai")
                -> separater Wrapper /v1/audio/speech auf primärem Voice-Server
 ```
 
-Damit bleiben Python-Abhängigkeiten isoliert und Contract-Tests erkennen Upstream-Änderungen. Bestehende Fallback-Voice-Server-Adapter und der OpenAI-kompatible primäre STT-Endpunkt bleiben explizite Bridge-Adapter. OmniVoice nutzt einen separaten TalkToHermes-Service/Port; TalkWithMe auf 8181 bleibt unberührt. Globale Hermes-Voice-Konfiguration wird nicht verändert.
+Damit bleiben Python-Abhängigkeiten isoliert und Contract-Tests erkennen Upstream-Änderungen. Konfigurierte Fallback-Adapter und der OpenAI-kompatible primäre STT-Endpunkt bleiben explizite Bridge-Adapter. OmniVoice nutzt einen separaten TalkToHermes-Service und Endpunkt. Globale Hermes-Voice-Konfiguration wird nicht verändert.
 
 ## Verfügbarkeitsmodi
 
@@ -106,4 +110,4 @@ Der iOS-17+-SwiftUI-Client akzeptiert Bridge-Hostname, HTTPS-Port und Bearer-Tok
 
 Der Bearer-Token liegt mit `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` in der Keychain. Ein leeres Token-Feld darf nur bei unverändertem Host/Port wiederverwenden; Änderungen verlangen expliziten Token. Fehlgeschlagene Validierung lässt alte Einstellungen intakt. Redirects bleiben auf demselben HTTPS-Origin. Endpunktwechsel baut den API-Client neu und löscht die aktuelle Konversationsbindung. Normale URLSession-Zertifikatsprüfung ist zwingend.
 
-Voice-Uploads tragen einen expliziten Sprach-Tag. Die App speichert `de` oder `en` unabhängig von UI-/Gerätesprache; fehlende/ungültige Legacy-Werte fallen auf Deutsch zurück. Aufnahme erfolgt Tap-to-start/Tap-to-send; Wiedergabe kann gestoppt/wiederholt werden; Mikrofon während Wiedergabe stoppt Audio und startet eine neue Aufnahme ohne Kontextverlust. Details: [`ios/README_DE.md`](../ios/README_DE.md).
+Voice-Uploads tragen einen expliziten Sprach-Tag. Die App speichert `de` oder `en` unabhängig von UI-/Gerätesprache; fehlende oder ungültige gespeicherte Werte fallen auf Deutsch zurück. Aufnahme erfolgt Tap-to-start/Tap-to-send; Wiedergabe kann gestoppt/wiederholt werden; Mikrofon während Wiedergabe stoppt Audio und startet eine neue Aufnahme ohne Kontextverlust. Details: [`ios/README_DE.md`](../ios/README_DE.md).

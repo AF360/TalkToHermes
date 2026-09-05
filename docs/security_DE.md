@@ -19,14 +19,14 @@ Der Client kann weder `profile` noch `instance_id` übermitteln. Instanzfremde T
 
 ## Netzwerk
 
-- Alle Instanzen verwenden `hermes-agent.home.arpa` unter `192.168.100.10` mit unterschiedlichen HTTPS-Ports.
+- Das dokumentierte Beispiel verwendet `hermes-agent.home.arpa` unter `192.168.100.10` mit unterschiedlichen HTTPS-Ports; Deployments setzen ihren eigenen privaten Hostnamen und ihre eigene Adresse ein.
 - Die native App enthält keinen einkompilierten installationsspezifischen Endpunkt. Sie akzeptiert zur Laufzeit Hostname und Port, erzeugt ausschließlich HTTPS-URLs und lehnt Schemas, Credentials, eingebettete Ports, Pfade, Queries, Fragmente und ungültige DNS-Labels ab.
 - Caddy ordnet jeden externen Port genau einer Loopback-Bridge zu.
 - `home.arpa`-TLS verwendet Caddys private PKI (`tls internal`); die interne Root-CA wird per Fingerprint verifiziert und auf verwalteten iOS-Geräten ausdrücklich vertraut. Kein öffentlicher ACME-DNS-Provider und kein DNS-API-Token.
 - Öffentliches Routing, Portweiterleitungen, Tunnel-Exposition und öffentliche Webhooks bleiben deaktiviert.
 - Direktes IP-TLS ist nur mit einem vertrauenswürdigen Zertifikat zulässig, das die private IP als SAN enthält. Die Prüfung wird niemals umgangen.
-- Hermes API, `hermes serve`, `/api/audio/*`, Wyoming, Coglet, OmniVoice und Piper bleiben private Backend-Schnittstellen.
-- OmniVoice akzeptiert ausschließlich einen konfigurierten RFC-1918-IPv4-Listener auf Port `9090`. `0.0.0.0`, Loopback-, öffentliche, Dokumentations- oder ungültige Adressen, Hostnamen, Port `8181` und jeder andere Port führen vor Uvicorn zu Fail-Closed. Der Listener-Preflight bindet exakt das validierte Tupel.
+- Hermes API, `hermes serve`, `/api/audio/*` und alle konfigurierten STT-/TTS-Provider bleiben private Backend-Schnittstellen.
+- OmniVoice akzeptiert ausschließlich einen konfigurierten RFC-1918-IPv4-Listener auf Port `9090`. `0.0.0.0`, Loopback-, öffentliche, Dokumentations- oder ungültige Adressen, Hostnamen und jeder andere Port führen vor Uvicorn zu Fail-Closed. Der Listener-Preflight bindet exakt das validierte Tupel.
 
 ## Eingabekontrollen
 
@@ -42,14 +42,14 @@ Der Voice Worker validiert Interpreter, Virtual-Environment-Grenze, Hermes-Root 
 
 ## Tool-Freigaben
 
-MVP-Entscheidungen sind nur `once` (konkrete Aktion einmalig genehmigen) und `deny` (ablehnen). `session` und `always` stehen nicht zur Verfügung. Eine Freigabe bleibt sichtbar, auch wenn Chat-Text ausgeblendet ist. Rein sprachbasierte Freigaben werden abgelehnt. Fehlende oder abgelaufene Freigaben gelten als Ablehnung.
+Unterstützt werden nur `once` (konkrete Aktion einmalig genehmigen) und `deny` (ablehnen). `session` und `always` stehen nicht zur Verfügung. Eine Freigabe bleibt sichtbar, auch wenn Chat-Text ausgeblendet ist. Rein sprachbasierte Freigaben werden abgelehnt. Fehlende oder abgelaufene Freigaben gelten als Ablehnung.
 
 ## Datenaufbewahrung
 
 - Fehlgeschlagene diagnostische Uploads werden standardmäßig höchstens 24 Stunden aufbewahrt; `retain_failed_audio=false` entfernt sie sofort.
 - Abgeschlossene und abgebrochene Uploads werden sofort entfernt; durch Neustart unterbrochene Arbeiten niemals aufbewahrt.
 - Nicht heruntergeladenes Antwort-Audio verfällt nach 24 Stunden. Der erste authentifizierte GET startet ein festes fünfminütiges Retry-/Reconnect-Lease; Wiederholungen verlängern es nicht.
-- Transkripte und Antworttext bleiben nach terminalem Turn höchstens 24 Stunden lokal lesbar. Danach werden beide Felder geschwärzt und texttragende `hermes.delta`-Events entfernt; inhaltsfreie Metriken und Provider-Versuchsereignisse bleiben. Aktive Turns werden nicht geschwärzt.
+- Transkripte und Antworttext bleiben nach terminalem Turn höchstens 24 Stunden lokal lesbar. Laufzeit-Previews von Tools werden niemals gespeichert; öffentliche Tool-Zusammenfassungen stammen ausschließlich aus statischer, vom Betreiber geprüfter Konfiguration und werden erst bei der Ausgabe ergänzt. Danach werden beide Textfelder geschwärzt, texttragende `hermes.delta`-Events und gespeicherte `summary`-Felder entfernt; inhaltsfreie Aufrufmarker, Freigabe-/Risikometadaten, Metriken und Provider-Versuchsereignisse bleiben. Aktive Turns werden nicht geschwärzt.
 - Bereinigung läuft beim Start und periodisch, ist idempotent, bleibt direkt im Audio-Root und folgt keinen Symlinks bzw. entfernt keine Einträge mit falschem Eigentümer/Modus.
 - Die Hermes-Session bleibt der längerlebige kanonische Gesprächskontext. Lokale Textschwärzung und TalkToHermes-Konversationslöschung löschen derzeit nicht die Hermes-Session.
 - Textsichtbarkeit ist nur eine Client-Präsentationseinstellung.
@@ -57,8 +57,16 @@ MVP-Entscheidungen sind nur `once` (konkrete Aktion einmalig genehmigen) und `de
 
 ## Logging
 
-Zulässig sind undurchsichtige Request-/Turn-IDs, Zustände, Laufzeiten, Provider-Namen, Token-Anzahlen und begrenzte Fehlercodes. Verboten sind Credentials/Authorization-Header, Roh-Audio, Clone-Referenzen, standardmäßig Transkripte, vollständige Tool-Payloads/-Ergebnisse, Dateisystempfade an Clients und ungeschwärzte Model-/Provider-Exceptions.
+Zulässig sind undurchsichtige Request-/Turn-IDs, Zustände, Laufzeiten, ausgewählte Provider-Namen, Token-Anzahlen und begrenzte Fehlercodes.
+
+Verboten sind:
+
+- Credentials oder Authorization-Header;
+- Roh-Audio, Clone-Referenzen und standardmäßig Transkripte;
+- Laufzeit-Previews, Argumente, Payloads, Ergebnisse oder Prompts von Tools sowie fehlerhafte Tool-IDs;
+- an Clients zurückgegebene Dateisystempfade;
+- ungeschwärzte Modell- oder Provider-Exceptions.
 
 ## Deployment-Berechtigungen
 
-Jeder Bridge- und Hermes-API-Prozess läuft als sein eigener unprivilegierter Unix-Benutzer. Gemeinsam genutzte root-eigene Voice-Adapter dürfen nur les-/ausführbar sein. Das Deployment erhält ausschließlich ausdrücklich aufgezählte Befehle: keine allgemeine sudo-Shell, Wildcards, Interpreter-Freigabe, Home-Assistant-Schreibberechtigung oder Remote-Root-Keys.
+Jeder Bridge- und Hermes-API-Prozess läuft als sein eigener unprivilegierter Unix-Benutzer. Gemeinsam genutzte root-eigene Voice-Adapter dürfen nur les-/ausführbar sein. Das Deployment erhält ausschließlich ausdrücklich aufgezählte Befehle: keine allgemeine sudo-Shell, Wildcards, Interpreter-Freigabe, Schreibrechte auf unabhängige Dienste oder Remote-Root-Keys.
