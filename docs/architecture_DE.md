@@ -1,6 +1,6 @@
 # TalkToHermes-Architektur
 
-![TalkToHermes architecture](/images/TalkToHermes-architecture.png)
+![TalkToHermes architecture](/images/TalkToHermes-architecture_DE.png)
 
 ## Ziel
 
