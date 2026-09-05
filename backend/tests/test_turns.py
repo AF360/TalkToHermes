@@ -287,6 +287,13 @@ async def test_approval_timeout_denies_stops_and_terminalizes_without_upstream_e
     turn = storage.get_turn(turn_id)
     assert turn.state == "failed"
     assert turn.error_code == "approval_timeout"
+    approval_events = [
+        event
+        for event in storage.list_events(turn_id)
+        if event.event_type == "hermes.approval_required"
+    ]
+    assert len(approval_events) == 1
+    assert approval_events[0].payload["tool"] == "shell"
 
 
 @pytest.mark.asyncio

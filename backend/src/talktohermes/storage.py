@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import uuid
 from dataclasses import dataclass
@@ -10,6 +11,11 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar
 
 from .response_style import RESPONSE_STYLES
+
+TOOL_NAME_RE = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,127}")
+MAX_TOOL_INVOCATIONS = 256
+MAX_TOOL_LIFECYCLE_EVENTS = 1_024
+MAX_EVENT_PAGE = 256
 
 T = TypeVar("T")
 
@@ -71,6 +77,8 @@ class Turn:
         }
         if self.response_text is not None and self.include_text:
             result["response_text"] = self.response_text
+        if self.input_text and self.include_text:
+            result["input_text"] = self.input_text
         if self.error_code is not None:
             result["error_code"] = self.error_code
         result["degraded_local_audio"] = bool(self.degraded_local_audio)
@@ -432,6 +440,18 @@ class Storage:
                 "DELETE FROM events WHERE turn_id = ? AND event_type = 'hermes.delta'",
                 ((row["id"],) for row in expired_turn_ids),
             )
+            connection.execute(
+                """UPDATE events
+                   SET payload_json = json_remove(payload_json, '$.summary')
+                   WHERE event_type = 'hermes.tool_started'
+                     AND json_valid(payload_json)
+                     AND json_type(payload_json, '$.summary') IS NOT NULL
+                     AND turn_id IN (
+                         SELECT id FROM turns
+                         WHERE terminal_at IS NOT NULL AND terminal_at <= ?
+                     )""",
+                (cutoff_value,),
+            )
             cursor = connection.execute(
                 """UPDATE turns SET input_text = '', response_text = NULL
                    WHERE terminal_at IS NOT NULL AND terminal_at <= ?
@@ -660,3 +680,144 @@ class Storage:
             )
             for row in rows
         ]
+
+    def latest_event_sequence(self, turn_id: str) -> int:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT COALESCE(MAX(sequence), 0) AS sequence FROM events WHERE turn_id = ?",
+                (turn_id,),
+            ).fetchone()
+        return int(row["sequence"])
+
+    def has_terminal_event_at_or_before(self, turn_id: str, sequence: int) -> bool:
+        if sequence < 0:
+            raise ValueError("invalid event sequence")
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT EXISTS(
+                       SELECT 1 FROM events
+                       WHERE turn_id = ? AND sequence <= ?
+                         AND event_type IN ('turn.completed', 'turn.failed', 'turn.cancelled')
+                   ) AS present""",
+                (turn_id, sequence),
+            ).fetchone()
+        return bool(row["present"])
+
+    def list_events_after(
+        self, turn_id: str, sequence: int, *, limit: int = MAX_EVENT_PAGE
+    ) -> list[Event]:
+        if sequence < 0 or not 1 <= limit <= MAX_EVENT_PAGE:
+            raise ValueError("invalid event page")
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM events
+                   WHERE turn_id = ? AND sequence > ?
+                   ORDER BY sequence LIMIT ?""",
+                (turn_id, sequence, limit),
+            ).fetchall()
+        return [
+            Event(
+                turn_id=row["turn_id"],
+                sequence=row["sequence"],
+                event_type=row["event_type"],
+                payload=json.loads(row["payload_json"]),
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+
+    def list_tool_names(self, turn_id: str) -> list[str]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT payload_json FROM events
+                   WHERE turn_id = ? AND event_type = 'hermes.tool_started'
+                   ORDER BY sequence LIMIT ?""",
+                (turn_id, MAX_TOOL_LIFECYCLE_EVENTS),
+            ).fetchall()
+        tools: list[str] = []
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            tool = payload.get("tool") if isinstance(payload, dict) else None
+            if (
+                isinstance(tool, str)
+                and TOOL_NAME_RE.fullmatch(tool)
+                and tool not in tools
+            ):
+                tools.append(tool)
+        return tools
+
+    def list_tool_invocations(self, turn_id: str) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM events
+                   WHERE turn_id = ? AND event_type IN (
+                       'hermes.approval_required',
+                       'hermes.approval_resolved',
+                       'hermes.tool_started'
+                   )
+                   ORDER BY sequence
+                   LIMIT ?""",
+                (turn_id, MAX_TOOL_LIFECYCLE_EVENTS),
+            ).fetchall()
+        events = [
+            Event(
+                turn_id=row["turn_id"],
+                sequence=row["sequence"],
+                event_type=row["event_type"],
+                payload=json.loads(row["payload_json"]),
+                created_at=row["created_at"],
+            )
+            for row in rows
+        ]
+        pending_approval: dict[str, Any] | None = None
+        invocations: list[dict[str, Any]] = []
+
+        for event in events:
+            payload = event.payload
+            if not isinstance(payload, dict):
+                continue
+            if event.event_type == "hermes.approval_resolved":
+                if payload.get("decision") == "once" and pending_approval is not None:
+                    pending_approval["approved"] = True
+                else:
+                    pending_approval = None
+                continue
+
+            if event.event_type == "hermes.approval_required":
+                pending_approval = None
+                tool = payload.get("tool")
+                if isinstance(tool, str) and TOOL_NAME_RE.fullmatch(tool) is not None:
+                    pending_approval = {"tool": tool, "approved": False}
+                    risk = payload.get("risk")
+                    if risk in {"low", "medium", "high"}:
+                        pending_approval["risk"] = risk
+                continue
+
+            if event.event_type != "hermes.tool_started":
+                continue
+            tool = payload.get("tool")
+            if not isinstance(tool, str) or TOOL_NAME_RE.fullmatch(tool) is None:
+                pending_approval = None
+                continue
+
+            if len(invocations) >= MAX_TOOL_INVOCATIONS:
+                break
+            invocation: dict[str, Any] = {
+                "id": f"tool-{event.sequence}",
+                "name": tool,
+                "status": "invoked",
+                "started_at": event.created_at,
+                "approval_required": False,
+            }
+            if (
+                pending_approval is not None
+                and pending_approval.get("approved") is True
+                and pending_approval.get("tool") == tool
+            ):
+                invocation["approval_required"] = True
+                if "risk" in pending_approval:
+                    invocation["risk"] = pending_approval["risk"]
+            pending_approval = None
+            invocations.append(invocation)
+
+        return invocations

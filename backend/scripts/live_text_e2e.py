@@ -69,6 +69,7 @@ def main() -> int:
         config_file = run_dir / "instance.yaml"
         config_file.write_text(
             f"""instance_id: instance-a-e2e
+assistant_name: Klaus
 profile: default
 development: true
 listen_host: 127.0.0.1

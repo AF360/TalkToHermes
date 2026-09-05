@@ -17,8 +17,15 @@ class Closeable:
         self.closed += 1
 
 
-def _client(tmp_path: Path, instance_id: str, token_char: str) -> tuple[TestClient, str]:
-    config = write_instance(tmp_path, instance_id=instance_id)
+def _client(
+    tmp_path: Path,
+    instance_id: str,
+    token_char: str,
+    assistant_name: str = "Klaus",
+) -> tuple[TestClient, str]:
+    config = write_instance(
+        tmp_path, instance_id=instance_id, assistant_name=assistant_name
+    )
     secret = tmp_path / f"{instance_id}.env"
     token = token_char * 48
     secret.write_text(
@@ -42,7 +49,18 @@ def test_v1_requires_bearer_token(tmp_path: Path) -> None:
     assert client.get("/v1/status", headers={"Authorization": "Bearer wrong"}).status_code == 401
     response = client.get("/v1/status", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
-    assert response.json() == {"status": "ready", "instance_id": "instance-a"}
+    assert response.json() == {"status": "ready", "instance_id": "instance-a", "assistant_name": "Klaus"}
+
+
+def test_status_returns_configured_assistant_name(tmp_path: Path) -> None:
+    client, token = _client(tmp_path, "instance-a", "a", assistant_name="T’Pol")
+
+    response = client.get(
+        "/v1/status", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["assistant_name"] == "T’Pol"
 
 
 def test_tokens_are_isolated_between_instances(tmp_path: Path) -> None:
@@ -62,7 +80,7 @@ def test_profile_cannot_be_selected_by_request(tmp_path: Path) -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 200
-    assert response.json() == {"status": "ready", "instance_id": "instance-a"}
+    assert response.json() == {"status": "ready", "instance_id": "instance-a", "assistant_name": "Klaus"}
 
 
 def test_shutdown_closes_only_explicitly_owned_resources(tmp_path: Path) -> None:

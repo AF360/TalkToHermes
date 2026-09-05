@@ -20,6 +20,7 @@ from .auth import require_app_token
 from .hermes_client import HermesClient
 from .models import (
     ApprovalRequest,
+    CancelResponse,
     ConversationResponse,
     StatusResponse,
     TextTurnRequest,
@@ -27,7 +28,7 @@ from .models import (
     TurnResponse,
 )
 from .settings import Settings
-from .storage import NotFoundError, Storage, TransitionError
+from .storage import NotFoundError, Storage, TOOL_NAME_RE, TransitionError
 from .stt.base import STTValidationError, validate_language
 from .retention import RetentionManager
 from .response_style import RESPONSE_STYLES
@@ -102,7 +103,7 @@ def create_app(
                 raise first_close_error
 
     app = FastAPI(
-        title="TalkToHermes Voice Bridge", version="1.0.1", lifespan=lifespan
+        title="TalkToHermes Voice Bridge", version="1.0.4", lifespan=lifespan
     )
 
     class RequestBodyTooLarge(Exception):
@@ -167,7 +168,11 @@ def create_app(
     app.state.retention.cleanup_restart_artifacts()
     app.state.retention.cleanup()
     app.state.turn_service = TurnService(
-        app.state.storage, app.state.hermes, stt=stt, tts=tts, audio_root=app.state.audio_root
+        app.state.storage,
+        app.state.hermes,
+        stt=stt,
+        tts=tts,
+        audio_root=app.state.audio_root,
     )
 
     def finish_task(task: asyncio.Task[Any], *, cleanup_audio: bool = False) -> None:
@@ -204,7 +209,11 @@ def create_app(
         response_model=StatusResponse,
     )
     async def bridge_status() -> dict[str, str]:
-        return {"status": "ready", "instance_id": settings.instance_id}
+        return {
+            "status": "ready",
+            "instance_id": settings.instance_id,
+            "assistant_name": settings.assistant_name,
+        }
 
     @app.post(
         "/v1/conversations",
@@ -362,7 +371,15 @@ def create_app(
         response_model_exclude_none=True,
     )
     async def get_turn(turn_id: str) -> dict[str, Any]:
-        return require_turn(turn_id).public_dict()
+        turn = require_turn(turn_id)
+        result = turn.public_dict()
+        result["tools"] = app.state.storage.list_tool_names(turn_id)
+        result["tool_invocations"] = app.state.storage.list_tool_invocations(turn_id)
+        for invocation in result["tool_invocations"]:
+            summary = settings.tool_summaries.get(invocation["name"])
+            if summary is not None:
+                invocation["summary"] = summary
+        return result
 
     @app.get(
         "/v1/turns/{turn_id}/events",
@@ -377,28 +394,29 @@ def create_app(
             replay_after = int(last_event_id or "0")
         except ValueError as exc:
             raise HTTPException(status_code=422, detail="Invalid Last-Event-ID") from exc
-        latest_sequence = max(
-            (event.sequence for event in app.state.storage.list_events(turn_id)), default=0
-        )
+        latest_sequence = app.state.storage.latest_event_sequence(turn_id)
         if replay_after < 0 or replay_after > latest_sequence:
             raise HTTPException(status_code=422, detail="Invalid Last-Event-ID")
-
         async def stream():
             sequence = replay_after
-            terminal_event_seen = False
             while True:
-                emitted = False
-                events = app.state.storage.list_events(turn_id)
+                events = app.state.storage.list_events_after(turn_id, sequence)
                 for event in events:
-                    if event.sequence <= sequence:
-                        if event.event_type in {"turn.completed", "turn.failed", "turn.cancelled"}:
-                            terminal_event_seen = True
-                        continue
+                    event_payload = event.payload
+                    if event.event_type == "hermes.tool_started":
+                        tool = event.payload.get("tool")
+                        if not isinstance(tool, str) or TOOL_NAME_RE.fullmatch(tool) is None:
+                            sequence = event.sequence
+                            continue
+                        event_payload = {"tool": tool}
+                        summary = settings.tool_summaries.get(tool)
+                        if summary is not None:
+                            event_payload["summary"] = summary
                     payload = {
                         "turn_id": turn_id,
                         "sequence": event.sequence,
                         "timestamp": event.created_at,
-                        **event.payload,
+                        **event_payload,
                     }
                     yield (
                         f"id: {event.sequence}\n"
@@ -406,13 +424,12 @@ def create_app(
                         f"data: {json.dumps(payload, ensure_ascii=False, separators=(',', ':'))}\n\n"
                     )
                     sequence = event.sequence
-                    emitted = True
-                    if event.event_type in {"turn.completed", "turn.failed", "turn.cancelled"}:
-                        terminal_event_seen = True
                 if (
                     app.state.storage.get_turn(turn_id).state in TERMINAL_STATES
-                    and terminal_event_seen
-                    and not emitted
+                    and app.state.storage.has_terminal_event_at_or_before(
+                        turn_id, sequence
+                    )
+                    and sequence >= app.state.storage.latest_event_sequence(turn_id)
                 ):
                     break
                 await asyncio.sleep(0.1)
@@ -482,6 +499,7 @@ def create_app(
     @app.post(
         "/v1/turns/{turn_id}/cancel",
         dependencies=[Depends(require_app_token)],
+        response_model=CancelResponse,
         status_code=status.HTTP_202_ACCEPTED,
     )
     async def cancel_turn(turn_id: str) -> dict[str, str]:

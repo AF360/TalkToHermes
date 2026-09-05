@@ -56,7 +56,7 @@ def test_caddy_exposes_only_tls_9444_to_loopback_5050() -> None:
     assert "192.168.100.20:5050" not in caddy
 
 
-def test_runbook_pins_gunicorn_without_invented_hash_and_preserves_old_services() -> None:
+def test_runbook_pins_gunicorn_without_invented_hash_and_documents_safe_installation() -> None:
     runbook = read("README.md")
     requirements = read("gunicorn.requirements.in")
     lock = read("gunicorn.requirements.lock")
@@ -73,12 +73,12 @@ def test_runbook_pins_gunicorn_without_invented_hash_and_preserves_old_services(
         "systemctl --user",
         "127.0.0.1:5050",
         "https://primary-voice-server.home.arpa:9444",
-        "5005",
-        "TalkWithMe",
         "/opt/stt/.venv/bin/python",
         "PyAV 16.0.1",
         "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
     ):
         assert required in runbook
+    assert "5005" not in runbook
+    assert "TalkWithMe" not in runbook
     assert "/opt/coglet-stt" not in runbook
     assert "sha256:<" not in requirements + lock

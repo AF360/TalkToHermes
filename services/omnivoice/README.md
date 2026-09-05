@@ -1,11 +1,9 @@
 # TalkToHermes OmniVoice service
 
-This independently versioned service component remains at `1.0.0`; the repository and Voice Bridge release version may advance without changing this adapter when its code and contract are unchanged.
+This independently versioned service component is version `1.0.0`. Repository and Voice Bridge releases use their own version numbers.
 
 Clean-room, dedicated OpenAI-compatible REST adapter for the Apache-2.0
-[k2-fsa/OmniVoice](https://github.com/k2-fsa/OmniVoice) public Python API. No source
-from the MIT-licensed `scorbo2/ai-playground` wrapper is copied or adapted here;
-TalkToHermes does not depend on that wrapper.
+[k2-fsa/OmniVoice](https://github.com/k2-fsa/OmniVoice) public Python API.
 
 ## Prerequisites and OmniVoice installation order
 
@@ -37,7 +35,7 @@ and no temporary files.
 
 Copy `config.example.yaml` outside the repository and replace placeholders. The
 service rejects wildcard, loopback, public, documentation-only or invalid IPs,
-hostnames, port `8181`, every port other than `9090`, unknown keys, unknown/unsafe voice IDs,
+hostnames, every port other than `9090`, unknown keys, unknown/unsafe voice IDs,
 non-private voice files, symlinks, wrong owners, malformed WAV files, and token
 files whose mode is not exactly `0600`. Every configured asset is opened with
 `O_NOFOLLOW`, checked against its inode, and read through a retained descriptor;
@@ -65,22 +63,19 @@ synthesis path must be re-verified after deployment, dependency, model, GPU, or
 runtime-path changes. Imports and model loading are lazy,
 so local service unit tests need neither a GPU nor downloaded model weights.
 
-## Verified target gate
+## Acceptance gate
 
-An unprivileged target-host gate completed successfully with the pinned
-`omnivoice==0.2.1` package and exact pinned model revision above, loaded offline
-through CUDA with a private server-side reference pair. Authenticated readiness
-returned `200 {"status":"ready"}` and authenticated synthesis returned a valid
-PCM 16-bit mono, 24 kHz WAV. A separate STT pass recovered the exact German
-words, and owner listening accepted the result without qualification. The
-pre-existing unrelated service on port `8181` remained healthy during and after
-the gate. The temporary process was stopped afterwards, its dedicated listener
-was confirmed free, and private model, reference, and output artifacts remained
-outside the repository.
+Run the service as its unprivileged account with the pinned `omnivoice==0.2.1`
+package and exact model revision above, loaded offline through the intended
+accelerator with a private server-side reference pair. Require authenticated
+readiness to return `200 {"status":"ready"}` and authenticated synthesis to
+return valid audio in the requested format. Verify representative pronunciation
+by transcription and listening, confirm that the dedicated listener is the only
+newly occupied port, and keep model, reference, and output artifacts outside the
+repository.
 
-No transactional installer is shipped: dependency/model/GPU provisioning cannot
-be fully exercised on this local non-production host, and an unverified privileged
-installer would weaken rather than harden deployment.
+No transactional installer is shipped because accelerator, model, and private
+voice-asset provisioning are host-specific and require operator verification.
 
 ## Tests
 

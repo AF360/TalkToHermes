@@ -51,6 +51,11 @@ def test_terminal_text_is_redacted_at_exactly_24_hours_without_losing_metadata(
     )
     db.set_run(turn.id, "run-retention")
     db.append_event(turn.id, "hermes.delta", {"delta": "private output"})
+    db.append_event(
+        turn.id,
+        "hermes.tool_started",
+        {"tool": "browser_exec", "summary": "private search terms"},
+    )
     db.append_event(turn.id, "tts.provider_attempt", {"provider": "omnivoice"})
     completed = db.complete_turn(turn.id, "private output")
     assert completed.terminal_at is not None
@@ -65,6 +70,7 @@ def test_terminal_text_is_redacted_at_exactly_24_hours_without_losing_metadata(
     )
     assert [event.event_type for event in db.list_events(turn.id)] == [
         "hermes.delta",
+        "hermes.tool_started",
         "tts.provider_attempt",
     ]
 
@@ -76,7 +82,17 @@ def test_terminal_text_is_redacted_at_exactly_24_hours_without_losing_metadata(
     assert redacted.terminal_at == completed.terminal_at
     assert redacted.updated_at == completed.updated_at
     assert [event.event_type for event in db.list_events(turn.id)] == [
+        "hermes.tool_started",
         "tts.provider_attempt"
+    ]
+    assert db.list_tool_invocations(turn.id) == [
+        {
+            "id": "tool-2",
+            "name": "browser_exec",
+            "status": "invoked",
+            "started_at": db.list_events(turn.id)[0].created_at,
+            "approval_required": False,
+        }
     ]
     assert manager.seconds_until_text_expiry(terminal_at + timedelta(hours=24)) is None
 

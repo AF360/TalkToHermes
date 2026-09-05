@@ -8,7 +8,14 @@ import pytest
 from talktohermes.settings import SettingsError, load_settings
 
 
-def write_instance(tmp_path: Path, *, instance_id: str = "instance-a", port: int = 0, host: str = "127.0.0.1") -> Path:
+def write_instance(
+    tmp_path: Path,
+    *,
+    instance_id: str = "instance-a",
+    assistant_name: str = "Klaus",
+    port: int = 0,
+    host: str = "127.0.0.1",
+) -> Path:
     state = tmp_path / instance_id
     state.mkdir(mode=0o700)
     worker = tmp_path / f"{instance_id}-worker"
@@ -46,12 +53,17 @@ def write_instance(tmp_path: Path, *, instance_id: str = "instance-a", port: int
     config = tmp_path / f"{instance_id}.yaml"
     config.write_text(
         f"""instance_id: {instance_id}
+assistant_name: {assistant_name}
 profile: default
 development: true
 listen_host: {host}
 listen_port: {port}
 state_dir: {state}
 secret_file: {secret}
+exposed_tools:
+  functions.browser_exec: terminal
+tool_summaries:
+  functions.browser_exec: Browseraktion ausgeführt
 hermes:
   base_url: http://127.0.0.1:8642
 stt:
@@ -81,9 +93,100 @@ voice_worker:
     return config
 
 
+def test_migrates_known_legacy_instance_name_without_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path, instance_id="klaus")
+    config.write_text(
+        config.read_text(encoding="utf-8").replace("assistant_name: Klaus\n", ""),
+        encoding="utf-8",
+    )
+
+    assert load_settings(config).assistant_name == "Klaus"
+
+
+def test_loads_configured_assistant_name(tmp_path: Path) -> None:
+    settings = load_settings(write_instance(tmp_path, assistant_name="T’Pol"))
+
+    assert settings.assistant_name == "T’Pol"
+
+
+def test_rejects_empty_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "assistant_name: Klaus", 'assistant_name: ""'
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+def test_rejects_overlong_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path, assistant_name="A" * 65)
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+def test_rejects_nonprinting_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path, assistant_name="\u200b")
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+def test_rejects_padded_assistant_name(tmp_path: Path) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "assistant_name: Klaus", 'assistant_name: " Klaus "'
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+def test_rejects_invalid_tool_summary_identifier(tmp_path: Path) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text().replace(
+            "  functions.browser_exec: Browseraktion ausgeführt",
+            '  "invalid tool": Verborgene Aktion',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
+@pytest.mark.parametrize("summary", [" secret ", "x" * 161, "Zeile\\nUmbruch"])
+def test_rejects_invalid_static_tool_summary(tmp_path: Path, summary: str) -> None:
+    config = write_instance(tmp_path)
+    config.write_text(
+        config.read_text().replace(
+            "  functions.browser_exec: Browseraktion ausgeführt",
+            f'  functions.browser_exec: "{summary}"',
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(SettingsError, match="invalid instance configuration"):
+        load_settings(config)
+
+
 def test_loads_valid_isolated_instance(tmp_path: Path) -> None:
     settings = load_settings(write_instance(tmp_path))
     assert settings.instance_id == "instance-a"
+    assert settings.assistant_name == "Klaus"
+    assert "tool_display_names" not in settings.model_dump()
+    assert "exposed_tools" not in settings.model_dump()
+    assert settings.tool_summaries == {
+        "functions.browser_exec": "Browseraktion ausgeführt"
+    }
     assert settings.listen_port == 0
     assert settings.app_token.get_secret_value() == "a" * 48
     assert settings.hermes.api_key.get_secret_value() == "h" * 48
@@ -106,6 +209,12 @@ def test_loads_valid_isolated_instance(tmp_path: Path) -> None:
     assert settings.voice_worker.python.parent.name == "bin"
     assert settings.text_retention_hours == 24.0
     assert settings.cleanup_interval_seconds == 900.0
+
+
+def test_legacy_exposed_tools_is_accepted_but_has_no_runtime_setting(tmp_path: Path) -> None:
+    settings = load_settings(write_instance(tmp_path))
+    assert "exposed_tools" not in settings.model_dump()
+    assert "tool_display_names" not in settings.model_dump()
 
 
 def test_text_retention_cannot_exceed_24_hours(tmp_path: Path) -> None:

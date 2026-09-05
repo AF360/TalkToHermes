@@ -2,12 +2,14 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var host = ""
     @State private var port = "8443"
     @State private var token = ""
     @State private var hasSavedToken = false
     @State private var responseStyle: VoiceResponseStyle = .short
     @State private var speechLanguage: SpeechLanguage = .german
+    @State private var colorTheme: HermesColorTheme = .default
     @State private var isChecking = false
     @State private var errorMessage: String?
     @State private var saveTask: Task<Void, Never>?
@@ -27,9 +29,9 @@ struct SettingsView: View {
                         HStack(spacing: 15) {
                             Image(systemName: "waveform.badge.shield")
                                 .font(.system(size: 27, weight: .semibold))
-                                .foregroundStyle(Color.hermesCopper)
+                                .foregroundStyle(colorTheme.palette.settingsHeaderIcon(for: colorScheme))
                                 .frame(width: 52, height: 52)
-                                .background(Color.hermesCopper.opacity(0.12), in: RoundedRectangle(cornerRadius: 15))
+                                .background(colorTheme.palette.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 15))
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Sichere Verbindung")
                                     .font(.headline)
@@ -107,6 +109,26 @@ struct SettingsView: View {
                         }
                     }
 
+                    Section("Darstellung") {
+                        Picker("Farbschema", selection: $colorTheme) {
+                            ForEach(HermesColorTheme.allCases) { theme in
+                                Text(theme.title).tag(theme)
+                            }
+                        }
+                        .disabled(isChecking)
+                        .accessibilityIdentifier("ColorThemePicker")
+
+                        HStack(spacing: 8) {
+                            ForEach(Array(colorTheme.palette.swatches.enumerated()), id: \.offset) { _, swatch in
+                                Color(hexRGB: swatch)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 28)
+                                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            }
+                        }
+                        .accessibilityHidden(true)
+                    }
+
                     Section("Datenschutz") {
                         Label("Audio wird nur für den aktuellen Sprachturn übertragen.", systemImage: "mic.badge.plus")
                         Label("Der Token wird beim Laden nie im Klartext angezeigt.", systemImage: "eye.slash.fill")
@@ -126,7 +148,7 @@ struct SettingsView: View {
                                 ProgressView()
                             } else {
                                 Image(systemName: "checkmark.circle")
-                                    .foregroundStyle(Color.hermesCopper)
+                                    .foregroundStyle(colorTheme.palette.controlAccent(for: colorScheme))
                             }
                             Text(
                                 isChecking
@@ -155,6 +177,7 @@ struct SettingsView: View {
                         let tokenSnapshot = token
                         let responseStyleSnapshot = responseStyle
                         let speechLanguageSnapshot = speechLanguage
+                        let colorThemeSnapshot = colorTheme
                         isChecking = true
                         saveTask = Task {
                             await saveAndVerify(
@@ -162,7 +185,8 @@ struct SettingsView: View {
                                 portText: portSnapshot,
                                 tokenText: tokenSnapshot,
                                 responseStyle: responseStyleSnapshot,
-                                speechLanguage: speechLanguageSnapshot
+                                speechLanguage: speechLanguageSnapshot,
+                                colorTheme: colorThemeSnapshot
                             )
                         }
                     }
@@ -188,7 +212,8 @@ struct SettingsView: View {
                 Text(errorMessage ?? String(localized: "Unbekannter Fehler"))
             }
         }
-        .tint(.hermesCopper)
+        .tint(colorTheme.palette.controlAccent(for: colorScheme))
+        .environment(\.hermesPalette, colorTheme.palette)
     }
 
     private var versionText: String {
@@ -205,6 +230,7 @@ struct SettingsView: View {
                 hasSavedToken = saved.hasToken
                 responseStyle = saved.responseStyle
                 speechLanguage = saved.speechLanguage
+                colorTheme = saved.colorTheme
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -216,7 +242,8 @@ struct SettingsView: View {
         portText: String,
         tokenText: String,
         responseStyle: VoiceResponseStyle,
-        speechLanguage: SpeechLanguage
+        speechLanguage: SpeechLanguage,
+        colorTheme: HermesColorTheme
     ) async {
         defer {
             isChecking = false
@@ -239,7 +266,8 @@ struct SettingsView: View {
                 portText: portText,
                 token: normalizedToken,
                 responseStyle: responseStyle,
-                speechLanguage: speechLanguage
+                speechLanguage: speechLanguage,
+                colorTheme: colorTheme
             )
             hasSavedToken = true
             token = ""
@@ -255,6 +283,8 @@ struct SettingsView: View {
     }
 }
 
+#if DEBUG
 #Preview {
     SettingsView()
 }
+#endif

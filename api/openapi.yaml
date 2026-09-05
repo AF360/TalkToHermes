@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: TalkToHermes Voice Bridge
-  version: 1.0.1
+  version: 1.0.4
 servers:
   - url: https://hermes-agent.home.arpa:{port}
     variables:
@@ -162,7 +162,7 @@ paths:
           description: Cancel accepted
           content:
             application/json:
-              schema: {$ref: "#/components/schemas/StatusResponse"}
+              schema: {$ref: "#/components/schemas/CancelResponse"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "404": {$ref: "#/components/responses/NotFound"}
 components:
@@ -190,10 +190,17 @@ components:
     StatusResponse:
       type: object
       additionalProperties: false
-      required: [status, instance_id]
+      required: [status, instance_id, assistant_name]
       properties:
         status: {type: string}
         instance_id: {type: string}
+        assistant_name: {type: string, minLength: 1, maxLength: 64}
+    CancelResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: {type: string, const: cancelled}
     ConversationResponse:
       type: object
       additionalProperties: false
@@ -240,6 +247,24 @@ components:
         turn_id: {type: string}
         state: {type: string}
         events_url: {type: string}
+    ToolInvocationResponse:
+      type: object
+      additionalProperties: false
+      required: [id, name, started_at]
+      properties:
+        id: {type: string, pattern: '^tool-[1-9][0-9]*$'}
+        name: {type: string, pattern: '^[A-Za-z][A-Za-z0-9_.-]{0,127}$'}
+        summary:
+          anyOf:
+            - {type: string, minLength: 1, maxLength: 160}
+            - {type: "null"}
+        status: {type: string, const: invoked, default: invoked}
+        started_at: {type: string, minLength: 1, maxLength: 64}
+        approval_required: {type: boolean, default: false}
+        risk:
+          anyOf:
+            - {type: string, enum: [low, medium, high]}
+            - {type: "null"}
     TurnResponse:
       type: object
       additionalProperties: false
@@ -251,8 +276,16 @@ components:
         state: {type: string}
         created_at: {type: string}
         updated_at: {type: string}
-        response_text: {type: [string, "null"]}
-        error_code: {type: [string, "null"]}
+        response_text: {anyOf: [{type: string}, {type: "null"}]}
+        input_text: {anyOf: [{type: string}, {type: "null"}]}
+        tools:
+          type: array
+          items: {type: string, pattern: '^[A-Za-z][A-Za-z0-9_.-]{0,127}$'}
+        tool_invocations:
+          type: array
+          maxItems: 256
+          items: {$ref: '#/components/schemas/ToolInvocationResponse'}
+        error_code: {anyOf: [{type: string}, {type: "null"}]}
         degraded_local_audio: {type: boolean, default: false}
     ApprovalRequest:
       type: object

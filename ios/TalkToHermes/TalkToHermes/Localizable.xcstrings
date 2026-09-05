@@ -81,6 +81,16 @@
         }
       }
     },
+    "Abbrechen" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
     "Ablehnen" : {
       "localizations" : {
         "en" : {
@@ -107,6 +117,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Response ready"
+          }
+        }
+      }
+    },
+    "Antwort bereit – Audio nicht verfügbar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response ready – audio unavailable"
           }
         }
       }
@@ -394,6 +414,16 @@
         }
       }
     },
+    "Der aktuell angezeigte Chat wird gelöscht." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The currently displayed chat will be deleted."
+          }
+        }
+      }
+    },
     "Der Turn konnte nicht sauber abgebrochen werden. Du kannst den Abbruch erneut versuchen: %@" : {
       "localizations" : {
         "en" : {
@@ -440,6 +470,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The audio response is too large to play."
+          }
+        }
+      }
+    },
+    "Die Antwort ist verfügbar, konnte aber nicht abgespielt werden: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The response is available but could not be played: %@"
           }
         }
       }
@@ -704,12 +744,12 @@
         }
       }
     },
-    "Knopf nicht gedrückt halten: einmal zum Starten tippen, einmal zum Senden. %@ antwortet anschließend automatisch per Sprache." : {
+    "Knopf nicht gedrückt halten: einmal zum Starten tippen, einmal zum Senden. Danach antwortet %@ automatisch per Sprache." : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "There is no need to hold a button: tap once to start and once to send. %@ then responds automatically with speech."
+            "value" : "There is no need to hold a button: tap once to start and once to send. Afterward, %@ responds automatically with speech."
           }
         }
       }
@@ -780,6 +820,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "New conversation"
+          }
+        }
+      }
+    },
+    "Neue Unterhaltung starten?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a new conversation?"
           }
         }
       }
@@ -1027,6 +1077,16 @@
         }
       }
     },
+    "Verwendete Tools: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tools used: %@"
+          }
+        }
+      }
+    },
     "Version" : {
       "localizations" : {
         "en" : {
@@ -1086,7 +1146,30 @@
           }
         }
       }
-    }
+    },
+    "Aufgerufen" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Invoked"}}}},
+    "Abgeschlossen" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Completed"}}}},
+    "Details zu %@, Aufruf %d" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Details for %@, call %d"}}}},
+    "Erforderlich" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Required"}}}},
+    "Fehlgeschlagen" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Failed"}}}},
+    "Freigabe" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Approval"}}}},
+    "Gestartet" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Started"}}}},
+    "Hoch" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "High"}}}},
+    "Keine weiteren Details verfügbar." : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "No further details available."}}}},
+    "Laufzeit" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Duration"}}}},
+    "Mittel" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Medium"}}}},
+    "Niedrig" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Low"}}}},
+    "Nicht erforderlich" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Not required"}}}},
+    "Nicht verfügbar" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Unavailable"}}}},
+    "Risiko" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Risk"}}}},
+    "Status" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Status"}}}},
+    "Tool-Aufruf %d" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Tool call %d"}}}},
+    "Zeigt sichere Details zu diesem Tool-Aufruf." : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Shows safe details for this tool call."}}}},
+    "Darstellung" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Appearance"}}}},
+    "Farbschema" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Color theme"}}}},
+    "Moosige Höhle" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Mossy Hollow"}}}},
+    "Schokoladentrüffel" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Chocolate Truffle"}}}},
+    "Stürmischer Morgen" : {"localizations" : {"en" : {"stringUnit" : {"state" : "translated", "value" : "Stormy Morning"}}}}
   },
   "version" : "1.0"
 }

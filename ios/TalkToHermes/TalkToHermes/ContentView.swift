@@ -2,103 +2,304 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(SettingsStore.colorThemeKey) private var colorThemeRaw = HermesColorTheme.default.rawValue
     @StateObject private var model = VoiceViewModel()
     @State private var showsSettings = false
+    @State private var showsNewConversationConfirmation = false
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                HermesBackground()
-
-                ScrollView {
-                    VStack(spacing: 22) {
-                        brandHeader
-                        voiceStage
-
-                        if !model.responseText.isEmpty {
-                            responsePanel
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        } else if !model.approvalRequired {
-                            introPanel
-                        }
-
-                        if model.degradedAudio {
-                            fallbackNotice
-                        }
-
-                        if model.approvalRequired {
-                            approvalPanel
-                                .transition(.scale.combined(with: .opacity))
-                        }
-
+            GeometryReader { geometry in
+                let metrics = VoiceLayout.metrics(for: geometry.size.width)
+                ZStack {
+                    HermesBackground()
+                    if metrics.mode == .wide {
+                        wideContent(metrics)
+                    } else {
+                        compactContent(metrics)
                     }
-                    .frame(maxWidth: 620)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 36)
+#if DEBUG
+                    if ProcessInfo.processInfo.arguments.contains("--ui-test-tool-activity") {
+                        Color.clear
+                            .frame(width: 1, height: 1)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("Bottom safe-area inset")
+                            .accessibilityValue(
+                                String(format: "%.3f", geometry.safeAreaInsets.bottom)
+                            )
+                            .accessibilityIdentifier("BottomSafeAreaInset")
+                    }
+#endif
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    Group {
+                        if metrics.mode == .wide {
+                            wideBottomBar(metrics)
+                        } else {
+                            primaryControls(diameter: metrics.recordButtonDiameter)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 8)
+                                .padding(.bottom, metrics.bottomContentPadding)
+                        }
+                    }
+                    .background(.ultraThinMaterial)
+                    .overlay(alignment: .top) {
+                        Divider().opacity(0.45)
+                    }
+                }
+                .toolbarBackground(.hidden, for: .navigationBar)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            showsNewConversationConfirmation = true
+                        } label: {
+                            Image(systemName: "square.and.pencil")
+                                .accessibilityIdentifier("NewConversationButton")
+                        }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel("Neue Unterhaltung")
+                        .disabled(locksNavigation)
+                    }
+                    ToolbarItem(placement: .principal) {
+                        if let diameter = metrics.toolbarOrbDiameter {
+                            HermesVoiceOrb(
+                                isRecording: model.recorder.isRecording,
+                                isBusy: model.isBusy || model.isStartingRecording || model.isRefreshingConfiguration,
+                                isPlaying: model.isPlaying,
+                                level: model.recorder.level,
+                                diameter: diameter
+                            )
+                        }
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            model.prepareForSettings()
+                            showsSettings = true
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .accessibilityIdentifier("SettingsButton")
+                        }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .accessibilityLabel("Einstellungen")
+                        .disabled(locksNavigation)
+                    }
+                }
+                .sheet(isPresented: $showsSettings, onDismiss: {
+                    Task { await model.refreshConfiguration() }
+                }) {
+                    SettingsView()
+                }
+                .alert(
+                    "Neue Unterhaltung starten?",
+                    isPresented: $showsNewConversationConfirmation
+                ) {
+                    Button("Neue Unterhaltung", role: .destructive) {
+                        handleNewConversation(.confirm)
+                    }
+                    Button("Abbrechen", role: .cancel) {
+                        handleNewConversation(.cancel)
+                    }
+                } message: {
+                    Text("Der aktuell angezeigte Chat wird gelöscht.")
+                }
+                .task {
+                    await model.refreshConfiguration()
+                }
+                .alert(
+                    "TalkToHermes-Fehler",
+                    isPresented: Binding(
+                        get: { model.errorMessage != nil },
+                        set: { if !$0 { model.errorMessage = nil } }
+                    )
+                ) {
+                    Button("OK", role: .cancel) { model.errorMessage = nil }
+                } message: {
+                    Text(model.errorMessage ?? String(localized: "Unbekannter Fehler"))
+                }
+                .animation(reduceMotion ? nil : .snappy, value: model.chatHistory)
+                .animation(reduceMotion ? nil : .snappy, value: model.approvalRequired)
+            }
+        }
+        .tint(palette.controlAccent(for: colorScheme))
+        .environment(\.hermesPalette, palette)
+    }
+
+    private func compactContent(_ metrics: VoiceLayoutMetrics) -> some View {
+        VStack(spacing: 0) {
+            if VoiceLayout.pinsBrandHeader(for: metrics.mode) {
+                brandHeader
+                    .frame(maxWidth: 680)
+                    .padding(.horizontal, 16)
+                    .padding(.top, metrics.brandHeaderTopPadding)
+                    .padding(.bottom, 8)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 16) {
+                        voiceStage(
+                            diameter: metrics.orbDiameter,
+                            showsOrb: metrics.showsInlineVoiceOrb
+                        )
+                        conversationContent
+                        chatBottomAnchor
+                    }
+                    .frame(maxWidth: 680)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 24)
                     .frame(maxWidth: .infinity)
                 }
                 .scrollIndicators(.hidden)
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    primaryControls
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 12)
-                        .padding(.bottom, 8)
-                        .background(.ultraThinMaterial)
-                        .overlay(alignment: .top) {
-                            Divider().opacity(0.45)
-                        }
+                .onChange(of: model.chatHistory.exchanges.last?.id) { _, latestID in
+                    scrollToLatest(latestID, using: proxy)
                 }
-            }
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        model.newConversation()
-                    } label: {
-                        Image(systemName: "square.and.pencil")
+                .onChange(of: model.approvalRequired) { previous, current in
+                    if ChatAutoScroll.shouldRevealApproval(from: previous, to: current) {
+                        scrollToBottom(using: proxy)
                     }
-                    .accessibilityLabel("Neue Unterhaltung")
-                    .disabled(locksNavigation)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showsSettings = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                    }
-                    .accessibilityLabel("Einstellungen")
-                    .disabled(locksNavigation)
                 }
             }
-            .sheet(isPresented: $showsSettings, onDismiss: {
-                Task { await model.refreshConfiguration() }
-            }) {
-                SettingsView()
-            }
-            .task {
-                await model.refreshConfiguration()
-            }
-            .alert(
-                "TalkToHermes-Fehler",
-                isPresented: Binding(
-                    get: { model.errorMessage != nil },
-                    set: { if !$0 { model.errorMessage = nil } }
-                )
-            ) {
-                Button("OK", role: .cancel) { model.errorMessage = nil }
-            } message: {
-                Text(model.errorMessage ?? String(localized: "Unbekannter Fehler"))
-            }
-            .animation(reduceMotion ? nil : .snappy, value: model.responseText)
-            .animation(reduceMotion ? nil : .snappy, value: model.approvalRequired)
         }
-        .tint(.hermesCopper)
+    }
+
+    private func wideContent(_ metrics: VoiceLayoutMetrics) -> some View {
+        VStack(spacing: 18) {
+            brandHeader
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 0) {
+                        conversationContent
+                            .frame(maxWidth: .infinity)
+                        chatBottomAnchor
+                    }
+                    .padding(.bottom, 24)
+                }
+                .scrollIndicators(.hidden)
+                .onChange(of: model.chatHistory.exchanges.last?.id) { _, latestID in
+                    scrollToLatest(latestID, using: proxy)
+                }
+                .onChange(of: model.approvalRequired) { previous, current in
+                    if ChatAutoScroll.shouldRevealApproval(from: previous, to: current) {
+                        scrollToBottom(using: proxy)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 12)
+    }
+
+    private func wideBottomBar(_ metrics: VoiceLayoutMetrics) -> some View {
+        Group {
+            if VoiceLayout.bottomBarMode(
+                isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
+            ) == .stacked {
+                VStack(spacing: 16) {
+                    wideVoiceStatus(metrics)
+                    primaryControls(diameter: metrics.recordButtonDiameter)
+                        .frame(maxWidth: .infinity)
+                }
+            } else {
+                HStack(spacing: 28) {
+                    wideVoiceStatus(metrics)
+                    primaryControls(diameter: metrics.recordButtonDiameter)
+                        .frame(width: 220)
+                }
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.top, 12)
+        .padding(.bottom, metrics.bottomContentPadding)
+    }
+
+    private func wideVoiceStatus(_ metrics: VoiceLayoutMetrics) -> some View {
+        HStack(spacing: 16) {
+            HermesVoiceOrb(
+                isRecording: model.recorder.isRecording,
+                isBusy: model.isBusy || model.isStartingRecording || model.isRefreshingConfiguration,
+                isPlaying: model.isPlaying,
+                level: model.recorder.level,
+                diameter: metrics.orbDiameter
+            )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(stageTitle)
+                    .font(.headline)
+                Text(stageSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if model.recorder.isRecording {
+                    Text(durationText)
+                        .font(.system(.caption, design: .monospaced, weight: .semibold))
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var conversationContent: some View {
+        VStack(spacing: 18) {
+            if model.chatHistory.exchanges.isEmpty {
+                if !model.approvalRequired {
+                    introPanel
+                }
+            } else {
+                ChatTimeline(
+                    exchanges: model.chatHistory.exchanges,
+                    hasPlayableResponse: model.hasPlayableResponse,
+                    isPlaying: model.isPlaying,
+                    onTogglePlayback: model.togglePlayback,
+                    onStopPlayback: model.stopResponsePlayback
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            if model.degradedAudio {
+                fallbackNotice
+            }
+
+            if model.approvalRequired {
+                approvalPanel
+                    .transition(.scale.combined(with: .opacity))
+            }
+        }
+    }
+
+    private var chatBottomAnchor: some View {
+        Color.clear
+            .frame(height: 1)
+            .id("chat-bottom")
+            .accessibilityHidden(true)
+    }
+
+    private func scrollToLatest(_ latestID: String?, using proxy: ScrollViewProxy) {
+        guard latestID != nil else { return }
+        scrollToBottom(using: proxy)
+    }
+
+    private func scrollToBottom(using proxy: ScrollViewProxy) {
+        withAnimation(reduceMotion ? nil : .snappy) {
+            proxy.scrollTo("chat-bottom", anchor: .bottom)
+        }
     }
 
     private var locksNavigation: Bool {
         model.isBusy || model.isStartingRecording || model.isRefreshingConfiguration ||
         model.canCancel || model.recorder.isRecording
+    }
+
+    private func handleNewConversation(_ decision: NewConversationDecision) {
+        guard decision.startsNewConversation else { return }
+        model.newConversation()
     }
 
     private var brandHeader: some View {
@@ -120,25 +321,30 @@ struct ContentView: View {
             Text("TalkToHermes")
                 .font(.title2.weight(.bold))
                 .tracking(-0.4)
+                .accessibilityIdentifier("BrandTitle")
             Text(String(format: String(localized: "Mit %@ sprechen"), model.assistantName))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
 
-    private var voiceStage: some View {
+    private func voiceStage(diameter: CGFloat, showsOrb: Bool = true) -> some View {
         VStack(spacing: 2) {
-            HermesVoiceOrb(
-                isRecording: model.recorder.isRecording,
-                isBusy: model.isBusy || model.isStartingRecording || model.isRefreshingConfiguration,
-                isPlaying: model.isPlaying,
-                level: model.recorder.level
-            )
+            if showsOrb {
+                HermesVoiceOrb(
+                    isRecording: model.recorder.isRecording,
+                    isBusy: model.isBusy || model.isStartingRecording || model.isRefreshingConfiguration,
+                    isPlaying: model.isPlaying,
+                    level: model.recorder.level,
+                    diameter: diameter
+                )
+            }
 
             Text(stageTitle)
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .contentTransition(.numericText())
+                .accessibilityIdentifier("VoiceStageTitle")
 
             Text(stageSubtitle)
                 .font(.subheadline)
@@ -189,80 +395,21 @@ struct ContentView: View {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "waveform.and.mic")
                     .font(.title2)
-                    .foregroundStyle(Color.hermesCopper)
+                    .foregroundStyle(palette.controlAccent(for: colorScheme))
                     .frame(width: 32)
                 VStack(alignment: .leading, spacing: 5) {
                     Text("Natürlich sprechen")
                         .font(.headline)
                     Text(
                         String(
-                            format: String(localized: "Knopf nicht gedrückt halten: einmal zum Starten tippen, einmal zum Senden. %@ antwortet anschließend automatisch per Sprache."),
+                            format: String(localized: "Knopf nicht gedrückt halten: einmal zum Starten tippen, einmal zum Senden. Danach antwortet %@ automatisch per Sprache."),
                             model.assistantName
                         )
                     )
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .allowsTightening(true)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-    }
-
-    private var responsePanel: some View {
-        HermesPanel {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Label(model.assistantName, systemImage: "sparkles")
-                        .font(.headline)
-                        .foregroundStyle(Color.hermesCopper)
-                    Spacer()
-                    if model.hasPlayableResponse {
-                        HStack(spacing: 8) {
-                            Button {
-                                model.togglePlayback()
-                            } label: {
-                                Label(
-                                    model.isPlaying
-                                        ? String(localized: "Pause")
-                                        : String(localized: "Erneut abspielen"),
-                                    systemImage: model.isPlaying ? "pause.fill" : "play.fill"
-                                )
-                                .labelStyle(.iconOnly)
-                                .frame(width: 38, height: 38)
-                            }
-                            .buttonStyle(.bordered)
-                            .buttonBorderShape(.circle)
-                            .accessibilityLabel(
-                                model.isPlaying
-                                    ? String(localized: "Wiedergabe pausieren")
-                                    : String(localized: "Antwort erneut abspielen")
-                            )
-
-                            if model.isPlaying {
-                                Button(role: .destructive) {
-                                    model.stopResponsePlayback()
-                                } label: {
-                                    Label("Wiedergabe stoppen", systemImage: "stop.fill")
-                                        .labelStyle(.iconOnly)
-                                        .frame(width: 38, height: 38)
-                                }
-                                .buttonStyle(.bordered)
-                                .buttonBorderShape(.circle)
-                                .accessibilityLabel("Wiedergabe stoppen")
-                            }
-                        }
-                    }
-                }
-
-                Text(model.responseText)
-                    .font(.body)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                ShareLink(item: model.responseText) {
-                    Label("Antwort teilen", systemImage: "square.and.arrow.up")
-                        .font(.subheadline.weight(.semibold))
                 }
             }
         }
@@ -281,7 +428,7 @@ struct ContentView: View {
             VStack(alignment: .leading, spacing: 15) {
                 Label("Freigabe erforderlich", systemImage: "checkmark.shield.fill")
                     .font(.headline)
-                    .foregroundStyle(Color.hermesCopper)
+                    .foregroundStyle(palette.normalForeground(for: colorScheme))
                 Text(
                     String(
                         format: String(localized: "%@ möchte eine Aktion ausführen. Die Freigabe gilt nur für diesen Vorgang."),
@@ -332,17 +479,17 @@ struct ContentView: View {
         return String(localized: "Startet eine neue Sprachaufnahme.")
     }
 
-    private var primaryControls: some View {
-        VStack(spacing: 14) {
+    private func primaryControls(diameter: CGFloat) -> some View {
+        VStack(spacing: 8) {
             Button {
                 model.toggleRecording()
             } label: {
                 ZStack {
                     Circle()
-                        .fill(model.recorder.isRecording ? Color.red : Color.hermesCopper)
-                        .frame(width: 88, height: 88)
+                        .fill(model.recorder.isRecording ? Color.red : palette.controlAccent(for: colorScheme))
+                        .frame(width: diameter, height: diameter)
                         .shadow(
-                            color: (model.recorder.isRecording ? Color.red : Color.hermesCopper).opacity(0.32),
+                            color: (model.recorder.isRecording ? Color.red : palette.controlAccent(for: colorScheme)).opacity(0.32),
                             radius: 18,
                             y: 8
                         )
@@ -351,8 +498,12 @@ struct ContentView: View {
                             .tint(.white)
                     } else {
                         Image(systemName: model.recorder.isRecording ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 30, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .font(.system(size: diameter * 0.34, weight: .semibold))
+                            .foregroundStyle(
+                                model.recorder.isRecording || colorScheme == .light
+                                    ? Color.white
+                                    : palette.foregroundOnAccent
+                            )
                     }
                 }
             }
@@ -364,6 +515,7 @@ struct ContentView: View {
             Text(primaryActionLabel)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(model.canSpeak || model.recorder.isRecording ? .primary : .secondary)
+                .accessibilityIdentifier("PrimaryActionLabel")
 
             if model.canCancel {
                 Button(role: .destructive) {
@@ -376,8 +528,22 @@ struct ContentView: View {
         }
         .padding(.top, 2)
     }
+
+    private var colorTheme: HermesColorTheme {
+        HermesColorTheme(rawValue: colorThemeRaw) ?? .default
+    }
+
+    private var palette: HermesPalette {
+        colorTheme.palette
+    }
 }
 
-#Preview {
+#if DEBUG
+#Preview("iPhone", traits: .fixedLayout(width: 390, height: 844)) {
     ContentView()
 }
+
+#Preview("iPad", traits: .fixedLayout(width: 1024, height: 1366)) {
+    ContentView()
+}
+#endif

@@ -9,7 +9,15 @@ from typing import Annotated, Literal
 from urllib.parse import urlparse
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationError, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from .response_style import DEFAULT_VOICE_INSTRUCTIONS
 from .worker_security import WorkerPathError, validate_worker_paths
@@ -25,6 +33,7 @@ SECRET_KEYS = frozenset(
 INSTANCE_ID_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 INSTANCE_MARKER = ".talktohermes-instance"
 MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+INTERNAL_TOOL_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_.-]{0,127}$")
 PIPER_VOICE_RE = re.compile(
     r"^[a-z]{2,3}_[A-Z]{2,3}-[a-z0-9_]+-(?:x_)?(?:low|medium|high)$"
 )
@@ -130,6 +139,7 @@ class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     instance_id: str
+    assistant_name: str = Field(min_length=1, max_length=64)
     profile: str = "default"
     development: bool = False
     listen_host: str = "127.0.0.1"
@@ -137,6 +147,7 @@ class Settings(BaseModel):
     state_dir: Path
     secret_file: Path
     app_token: SecretStr
+    tool_summaries: dict[str, str] = Field(default_factory=dict)
     hermes: HermesSettings
     stt: tuple[STTProviderSettings, ...] = Field(min_length=1, max_length=3)
     tts: tuple[TTSProviderSettings, ...] = Field(min_length=1, max_length=3)
@@ -146,6 +157,28 @@ class Settings(BaseModel):
     text_retention_hours: float = Field(default=24.0, ge=1, le=24)
     audio_download_grace_seconds: float = Field(default=300.0, ge=1, le=3600)
     cleanup_interval_seconds: float = Field(default=900.0, ge=1, le=900)
+
+    @field_validator("assistant_name")
+    @classmethod
+    def validate_assistant_name(cls, value: str) -> str:
+        if value != value.strip() or not value.isprintable():
+            raise ValueError("invalid assistant name")
+        return value
+
+    @model_validator(mode="after")
+    def validate_tool_summaries(self) -> Settings:
+        if (
+            len(self.tool_summaries) > 64
+            or any(
+                INTERNAL_TOOL_ID_RE.fullmatch(tool_name) is None
+                or not 1 <= len(summary) <= 160
+                or summary != summary.strip()
+                or not summary.isprintable()
+                for tool_name, summary in self.tool_summaries.items()
+            )
+        ):
+            raise ValueError("invalid tool summaries")
+        return self
 
 
 def _read_secret_file(path: Path) -> dict[str, str]:
@@ -317,6 +350,17 @@ def load_settings(path: Path | str) -> Settings:
         raise SettingsError("app, Hermes, and voice secrets must be different")
 
     merged = dict(payload)
+    merged.pop("exposed_tools", None)
+    if "assistant_name" not in merged:
+        legacy_assistant_names = {"klaus": "Klaus", "johanna": "Johanna"}
+        legacy_instance_id = merged.get("instance_id")
+        legacy_name = (
+            legacy_assistant_names.get(legacy_instance_id)
+            if isinstance(legacy_instance_id, str)
+            else None
+        )
+        if legacy_name is not None:
+            merged["assistant_name"] = legacy_name
     merged["secret_file"] = secret_path
     merged["app_token"] = SecretStr(app_token)
     hermes_payload = merged.get("hermes")

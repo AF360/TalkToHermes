@@ -6,14 +6,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 UMask=0077
-WorkingDirectory=%h/TalkToHermes-OmniVoice-Test/source
-Environment=PYTHONPATH=%h/TalkToHermes-OmniVoice-Test/source/.venv/lib/python3.11/site-packages:%h/TalkToHermes-OmniVoice-Test/source/src
-Environment=HF_HUB_CACHE=%h/TalkToHermes-OmniVoice-Test/private/model
+WorkingDirectory=%h/.local/opt/talktohermes-omnivoice/current
+Environment=PYTHONPATH=%h/.local/opt/talktohermes-omnivoice/current/src
+Environment=HF_HUB_CACHE=%h/.local/share/talktohermes-omnivoice/model
 Environment=HF_HUB_OFFLINE=1
 Environment=TRANSFORMERS_OFFLINE=1
-Environment=XDG_CACHE_HOME=%h/TalkToHermes-OmniVoice-Test/runtime/cache
+Environment=XDG_CACHE_HOME=%h/.cache/talktohermes-omnivoice
 Environment=PYTHONNOUSERSITE=1
-ExecStart=/usr/bin/python3.11 -m talktohermes_omnivoice.cli --config %h/TalkToHermes-OmniVoice-Test/state/config.yaml
+ExecStart=%h/.local/opt/talktohermes-omnivoice/venv/bin/python -m talktohermes_omnivoice.cli --config %h/.config/talktohermes-omnivoice/config.yaml
 Restart=on-failure
 RestartSec=5s
 TimeoutStartSec=10min
@@ -37,7 +37,7 @@ RestrictSUIDSGID=true
 LockPersonality=true
 MemoryDenyWriteExecute=false
 SystemCallArchitectures=native
-ReadWritePaths=%h/TalkToHermes-OmniVoice-Test/runtime/cache
+ReadWritePaths=%h/.cache/talktohermes-omnivoice
 MemoryMax=24G
 TasksMax=256
 LimitNOFILE=4096

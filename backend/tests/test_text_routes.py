@@ -64,6 +64,19 @@ def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_authenticated_status_exposes_configured_assistant_name(tmp_path: Path) -> None:
+    client, token, _, _ = configured_client(tmp_path)
+
+    response = client.get("/v1/status", headers=auth(token))
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready",
+        "instance_id": "instance-a",
+        "assistant_name": "Klaus",
+    }
+
+
 def test_conversation_and_text_turn_complete_in_real_mapping(tmp_path: Path) -> None:
     client, token, storage, hermes = configured_client(tmp_path)
     conversation_response = client.post("/v1/conversations", headers=auth(token))
@@ -128,6 +141,48 @@ def test_events_are_replayed_as_sse_without_internal_ids(tmp_path: Path) -> None
     assert "run-" not in response.text
 
 
+def test_historical_tool_summary_is_replaced_at_rest_and_sse_egress(tmp_path: Path) -> None:
+    client, token, storage, _ = configured_client(tmp_path)
+    conversation_id = client.post(
+        "/v1/conversations", headers=auth(token)
+    ).json()["conversation_id"]
+    turn_id = client.post(
+        f"/v1/conversations/{conversation_id}/turns/text",
+        headers=auth(token),
+        json={"client_turn_id": "legacy-summary", "text": "Hallo"},
+    ).json()["turn_id"]
+    storage.append_event(
+        turn_id,
+        "hermes.tool_started",
+        {
+            "tool": "Browser",
+            "summary": "/private/legacy/path token=abc",
+            "unexpected": "secret",
+        },
+    )
+    storage.append_event(
+        turn_id,
+        "hermes.tool_started",
+        {"tool": "Formerly Exposed Tool", "summary": "legacy secret"},
+    )
+
+    turn = client.get(f"/v1/turns/{turn_id}", headers=auth(token)).json()
+    events = client.get(f"/v1/turns/{turn_id}/events", headers=auth(token)).text
+
+    assert [item["name"] for item in turn["tool_invocations"]] == ["Browser"]
+    assert "summary" not in turn["tool_invocations"][0]
+    assert "Browseraktion ausgeführt" not in events
+    assert "/private/legacy/path" not in str(turn)
+    assert "/private/legacy/path" not in events
+    assert "token=abc" not in str(turn)
+    assert "token=abc" not in events
+    assert "unexpected" not in events
+    assert "Formerly Exposed Tool" not in str(turn)
+    assert "Formerly Exposed Tool" not in events
+    assert "legacy secret" not in str(turn)
+    assert "legacy secret" not in events
+
+
 def test_approval_contract_is_once_or_deny_only(tmp_path: Path) -> None:
     client, token, storage, hermes = configured_client(tmp_path)
     conversation_id = client.post("/v1/conversations", headers=auth(token)).json()["conversation_id"]
@@ -174,6 +229,59 @@ def test_last_event_id_replays_only_newer_events(tmp_path: Path) -> None:
     assert ids and min(ids) > 2
 
 
+def test_sse_replay_does_not_use_unbounded_event_listing(tmp_path: Path) -> None:
+    client, token, storage, _ = configured_client(tmp_path)
+    conversation_id = client.post(
+        "/v1/conversations", headers=auth(token)
+    ).json()["conversation_id"]
+    turn_id = client.post(
+        f"/v1/conversations/{conversation_id}/turns/text",
+        headers=auth(token),
+        json={"client_turn_id": "bounded-replay", "text": "Hallo"},
+    ).json()["turn_id"]
+
+    def unbounded_listing_is_forbidden(turn_id: str):
+        raise AssertionError("SSE must use paged event reads")
+
+    storage.list_events = unbounded_listing_is_forbidden  # type: ignore[method-assign]
+
+    response = client.get(f"/v1/turns/{turn_id}/events", headers=auth(token))
+    assert response.status_code == 200
+    assert "turn.completed" in response.text
+
+
+@pytest.mark.asyncio
+async def test_sse_waits_for_terminal_event_after_state_becomes_terminal(tmp_path: Path) -> None:
+    config = write_instance(tmp_path)
+    settings = load_settings(config)
+    storage = Storage(settings.state_dir / "terminal-race.sqlite3")
+    hermes = FakeHermes()
+    app = create_app(settings, storage=storage, hermes=hermes)
+    conversation = storage.create_conversation("hs-terminal-race")
+    turn, _ = storage.create_or_get_text_turn(
+        conversation.id, "terminal-race", "Hallo"
+    )
+    storage.set_run(turn.id, "run-terminal-race")
+    storage.complete_turn(turn.id, "Fertig")
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as api:
+        pending = asyncio.create_task(
+            api.get(
+                f"/v1/turns/{turn.id}/events",
+                headers=auth(settings.app_token.get_secret_value()),
+            )
+        )
+        await asyncio.sleep(0.15)
+        assert not pending.done()
+        terminal = storage.append_event(turn.id, "turn.completed", {})
+        response = await asyncio.wait_for(pending, timeout=1)
+
+    assert response.status_code == 200
+    assert f"id: {terminal.sequence}" in response.text
+    assert "event: turn.completed" in response.text
+
+
 def test_last_event_id_rejects_invalid_negative_and_future_values(tmp_path: Path) -> None:
     client, token, storage, _ = configured_client(tmp_path)
     conversation_id = client.post("/v1/conversations", headers=auth(token)).json()["conversation_id"]
@@ -204,6 +312,7 @@ def test_include_text_false_redacts_response_and_delta_events(tmp_path: Path) ->
     turn = client.get(f"/v1/turns/{turn_id}", headers=auth(token))
     events = client.get(f"/v1/turns/{turn_id}/events", headers=auth(token))
     assert "response_text" not in turn.json()
+    assert "input_text" not in turn.json()
     assert "raw transcript" not in events.text
     assert "Hallo Welt" not in events.text
     assert "hermes.delta" not in events.text

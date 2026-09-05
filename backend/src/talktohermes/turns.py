@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from .storage import Storage, TransitionError
+from .storage import Storage, TOOL_NAME_RE, TransitionError
 
 TERMINAL_STATES = frozenset({"completed", "failed", "cancelled"})
 
@@ -210,6 +210,12 @@ class TurnService:
                         output_parts.append(delta)
                         if turn.include_text:
                             self.storage.append_event(turn_id, "hermes.delta", {"delta": delta})
+                elif event_name == "tool.started":
+                    tool = event.get("tool")
+                    if isinstance(tool, str) and TOOL_NAME_RE.fullmatch(tool) is not None:
+                        self.storage.append_event(
+                            turn_id, "hermes.tool_started", {"tool": tool}
+                        )
                 elif event_name == "approval.request":
                     expires_at = self._parse_expiry(event.get("expires_at"))
                     if expires_at is None:
@@ -219,7 +225,7 @@ class TurnService:
                     self.storage.await_approval(turn_id, expires_at.isoformat())
                     safe: dict[str, Any] = {}
                     tool = event.get("tool")
-                    if isinstance(tool, str) and re.fullmatch(r"[A-Za-z0-9_.:-]{1,64}", tool):
+                    if isinstance(tool, str) and TOOL_NAME_RE.fullmatch(tool) is not None:
                         safe["tool"] = tool
                     risk = event.get("risk")
                     if isinstance(risk, str) and risk.lower() in {"low", "medium", "high"}:
