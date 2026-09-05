@@ -1,12 +1,4 @@
-hermes-agent.home.arpa {
-	tls internal
-	reverse_proxy 127.0.0.2:9119 {
-		header_up Host 127.0.0.2
-		header_up X-Forwarded-Host {host}
-		header_up X-Forwarded-Proto {scheme}
-	}
-}
-
+# Merge this TalkToHermes site block into the operator-managed Caddyfile.
 https://hermes-agent.home.arpa:8443 {
 	tls internal
 	reverse_proxy 127.0.0.1:18081

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
 import re
 import subprocess
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import yaml
@@ -94,11 +97,11 @@ def test_three_transactional_deployment_scripts_are_present_and_parse() -> None:
     assert "127.0.0.1" in bridge and "/health" in bridge
 
     primary_voice_server = read(scripts[1])
-    assert "talktohermes-stt-candidate.service" in primary_voice_server
+    assert "talktohermes-stt.service" in primary_voice_server
     assert "talktohermes-omnivoice.service" in primary_voice_server
-    assert "127.0.0.1:5050/health" in primary_voice_server
+    assert "127.0.0.1:5050/ready" in primary_voice_server
     assert "192.168.100.20" in primary_voice_server
-    assert "voice_host_ip}:9090/health" in primary_voice_server
+    assert "voice_host_ip}:9090/ready" in primary_voice_server
 
     piper = read(scripts[2])
     assert "launchctl bootstrap" in piper
@@ -181,7 +184,7 @@ def test_user_instance_example_matches_user_service_paths() -> None:
     )
     runbook = read("README.md")
     assert "Preferred bridge user-service installation" in runbook
-    assert "Legacy root/system-service install" in runbook
+    assert "Alternative root-owned system-service install" in runbook
     assert "instance.user.yaml.example" in runbook
 
 
@@ -213,27 +216,15 @@ def test_caddy_fragment_is_https_custom_port_to_loopback_only() -> None:
     assert "cloudflared" not in fragment.lower()
 
     merged = read("caddy/Caddyfile.merged.example")
-    assert "hermes-agent.home.arpa" in merged
-    assert "reverse_proxy 127.0.0.2:9119" in merged
-    assert "header_up Host 127.0.0.2" in merged
     assert "hermes-agent.home.arpa:8443" in merged
     assert "reverse_proxy 127.0.0.1:18081" in merged
-    assert merged.count("tls internal") == 2
+    assert merged.count("tls internal") == 1
+    assert "9119" not in merged
     assert "cloudflare" not in merged.lower()
 
 
-def test_custom_caddy_image_builds_pinned_cloudflare_plugin_without_secrets() -> None:
-    dockerfile = read("caddy/Dockerfile")
-    assert "ARG " not in dockerfile
-    assert "sha256:4bdeabce8e79d36b23d1cba7d20598cec2c1117ace960d8ca06071f945e8fc9b" in dockerfile
-    assert "sha256:df7f1c2fb114453b951de51a98efc010db1655a92c2e86be6706714e2417a78d" in dockerfile
-    assert "FROM caddy:2.11.4-builder@sha256:" in dockerfile
-    assert "FROM caddy:2.11.4@sha256:" in dockerfile
-    assert "xcaddy build v2.11.4" in dockerfile
-    assert "--with github.com/caddy-dns/cloudflare@a8737d095ad5a48ca031cea6ab704057dbc2d250" in dockerfile
-    assert "COPY --from=builder /usr/bin/caddy /usr/bin/caddy" in dockerfile
-    assert "TOKEN" not in dockerfile
-    assert "SECRET" not in dockerfile
+def test_caddy_example_needs_no_site_specific_custom_image() -> None:
+    assert not (DEPLOYMENT / "caddy" / "Dockerfile").exists()
 
 
 def test_caddy_compose_uses_host_network_runtime_mounts_and_no_literal_secrets() -> None:
@@ -241,15 +232,339 @@ def test_caddy_compose_uses_host_network_runtime_mounts_and_no_literal_secrets()
     compose = yaml.safe_load(compose_text)
     service = compose["services"]["caddy"]
     assert service["network_mode"] == "host"
-    assert service["container_name"] == "caddy-hermesagent"
-    assert service["image"] == "local/caddy-hermesagent:2.11.4-cloudflare-a8737d095ad5"
+    assert "container_name" not in service
+    assert service["image"] == "caddy:2.11.4@sha256:df7f1c2fb114453b951de51a98efc010db1655a92c2e86be6706714e2417a78d"
     assert "environment" not in service
-    assert "args" not in service["build"]
-    assert any("/opt/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" in item for item in service["volumes"])
+    assert "build" not in service
+    assert any("./Caddyfile:/etc/caddy/Caddyfile:ro" in item for item in service["volumes"])
+    assert "/opt/" not in compose_text
     assert all("cloudflare_api_token" not in item for item in service["volumes"])
     assert "CF_API_TOKEN=" not in compose_text
     assert "CLOUDFLARE_API_TOKEN" not in compose_text
     assert "APP_TOKEN=" not in compose_text
+
+
+def test_primary_voice_server_deployer_uses_released_names_and_authenticated_readiness() -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    unit_stt = read("systemd/talktohermes-stt-user.service")
+    unit_omni = read("systemd/talktohermes-omnivoice-user.service")
+
+    for historical in (
+        "TalkToHermes-OmniVoice-Test",
+        "TalkToHermes-STT-Candidate",
+        "talktohermes-stt-candidate.service",
+        "/health",
+    ):
+        assert historical not in script
+        assert historical not in unit_stt
+        assert historical not in unit_omni
+
+    assert "talktohermes-stt.service" in script
+    assert "talktohermes-omnivoice.service" in script
+    assert "http://127.0.0.1:5050/ready" in script
+    assert 'http://${voice_host_ip}:9090/ready' in script
+    assert "--config" in script
+
+
+def test_primary_voice_server_deployer_accepts_only_rfc1918_voice_addresses() -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    for network in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"):
+        assert network in script
+    assert ".is_private" not in script
+
+
+def test_primary_voice_server_auth_config_accepts_token_file_line_endings(
+    tmp_path: Path,
+) -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    match = re.search(r"(?ms)^make_auth_config\(\) \{\n.*?^\}\n", script)
+    assert match is not None
+
+    token = "A" * 32
+    for case, contents in (("newline", token + "\n"), ("no-newline", token)):
+        token_file = tmp_path / f"{case}.token"
+        auth_file = tmp_path / f"{case}.curl.conf"
+        token_file.write_text(contents, encoding="utf-8")
+
+        subprocess.run(
+            [
+                "bash",
+                "-c",
+                "set -euo pipefail\n"
+                + match.group(0)
+                + '\nmake_auth_config "$1" "$2"\n',
+                "auth-config-test",
+                str(token_file),
+                str(auth_file),
+            ],
+            check=True,
+        )
+
+        assert auth_file.read_text(encoding="utf-8") == (
+            f'header = "Authorization: Bearer {token}"\n'
+        )
+        assert auth_file.stat().st_mode & 0o777 == 0o600
+
+
+def test_primary_voice_server_auth_config_preserves_curl_metacharacters(
+    tmp_path: Path,
+) -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    match = re.search(r"(?ms)^make_auth_config\(\) \{\n.*?^\}\n", script)
+    assert match is not None
+    received: list[str | None] = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            received.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        tokens = [
+            "A" * 31 + '"',
+            "B" * 31 + "\\",
+            "C" * 32 + r"\nX-Evil:yes",
+            "D" * 32 + r"\rX-Evil:yes",
+        ]
+        for index, token in enumerate(tokens):
+            token_file = tmp_path / f"meta-{index}.token"
+            auth_file = tmp_path / f"meta-{index}.curl.conf"
+            token_file.write_text(token, encoding="ascii")
+            subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    "set -euo pipefail\n"
+                    + match.group(0)
+                    + '\nmake_auth_config "$1" "$2"\n',
+                    "auth-config-test",
+                    str(token_file),
+                    str(auth_file),
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "curl",
+                    "--config",
+                    str(auth_file),
+                    "--fail",
+                    "--silent",
+                    f"http://127.0.0.1:{server.server_port}/ready",
+                ],
+                check=True,
+            )
+            assert received[-1] == f"Bearer {token}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+
+def test_primary_voice_server_readiness_ignores_curlrc_and_proxies(
+    tmp_path: Path,
+) -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    match = re.search(r"(?ms)^wait_ready\(\) \{\n.*?^\}\n", script)
+    assert match is not None
+    target_requests: list[dict[str, str]] = []
+    proxy_requests: list[dict[str, str]] = []
+
+    class TargetHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            target_requests.append(dict(self.headers.items()))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    class ProxyHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            proxy_requests.append(dict(self.headers.items()))
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    target = HTTPServer(("127.0.0.1", 0), TargetHandler)
+    proxy = HTTPServer(("127.0.0.1", 0), ProxyHandler)
+    threads = [
+        threading.Thread(target=target.serve_forever, daemon=True),
+        threading.Thread(target=proxy.serve_forever, daemon=True),
+    ]
+    for thread in threads:
+        thread.start()
+    try:
+        home = tmp_path / "home"
+        home.mkdir()
+        (home / ".curlrc").write_text('header = "X-From-Curlrc: yes"\n', encoding="ascii")
+        auth_file = tmp_path / "auth.curl.conf"
+        auth_file.write_text('header = "Authorization: Bearer test-token"\n', encoding="ascii")
+        env = os.environ.copy()
+        env.update(
+            HOME=str(home),
+            http_proxy=f"http://127.0.0.1:{proxy.server_port}",
+            HTTP_PROXY=f"http://127.0.0.1:{proxy.server_port}",
+            ALL_PROXY=f"http://127.0.0.1:{proxy.server_port}",
+            NO_PROXY="",
+            no_proxy="",
+        )
+        subprocess.run(
+            [
+                "bash",
+                "-c",
+                "set -euo pipefail\n"
+                + match.group(0)
+                + '\nwait_ready "$1" "$2" 1\n',
+                "readiness-test",
+                f"http://127.0.0.1:{target.server_port}/ready",
+                str(auth_file),
+            ],
+            check=True,
+            env=env,
+        )
+    finally:
+        target.shutdown()
+        proxy.shutdown()
+        for thread in threads:
+            thread.join(timeout=5)
+
+    assert len(target_requests) == 1
+    assert proxy_requests == []
+    assert target_requests[0]["Authorization"] == "Bearer test-token"
+    assert "X-From-Curlrc" not in target_requests[0]
+
+
+def test_primary_voice_server_readiness_requires_exact_http_200(tmp_path: Path) -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    match = re.search(r"(?ms)^wait_ready\(\) \{\n.*?^\}\n", script)
+    assert match is not None
+
+    class RedirectHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(302)
+            self.send_header("Location", "/elsewhere")
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), RedirectHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        auth_file = tmp_path / "auth.curl.conf"
+        auth_file.write_text('header = "Authorization: Bearer test-token"\n', encoding="ascii")
+        result = subprocess.run(
+            [
+                "bash",
+                "-c",
+                "set -euo pipefail\n"
+                + match.group(0)
+                + '\nwait_ready "$1" "$2" 1\n',
+                "readiness-test",
+                f"http://127.0.0.1:{server.server_port}/ready",
+                str(auth_file),
+            ],
+            check=False,
+        )
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+
+    assert result.returncode != 0
+
+
+def test_primary_voice_server_commits_only_after_secret_cleanup() -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    success = script[script.rindex('systemctl --user is-active --quiet "$omni_service"') :]
+    assert success.index('rm -f "$omni_auth" "$stt_auth"') < success.index(
+        "transaction_active=0"
+    )
+    assert success.index("transaction_active=0") < success.index('rm -rf "$backup"')
+    assert 'echo "Warning: could not remove secret-free recovery backup at $backup"' in success
+
+
+def test_primary_voice_server_deployer_removes_secret_backup_on_every_exit() -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    rollback = script[script.index("rollback() {") : script.index("\n}\ntransaction_active=1")]
+    assert 'rm -rf "$backup"' in rollback
+    assert script.count('rm -rf "$backup"') == 2
+
+
+def test_primary_voice_server_incomplete_rollback_preserves_recovery_backup(
+    tmp_path: Path,
+) -> None:
+    script = read("scripts/deploy-primary-voice-server-user-services.sh")
+    rollback = script[
+        script.index("rollback() {") : script.index("\n}\ntransaction_active=1") + 2
+    ]
+    backup = tmp_path / "backup"
+    backup.mkdir()
+    (backup / "omnivoice.curl.conf").write_text("sensitive", encoding="utf-8")
+    (backup / "stt.curl.conf").write_text("sensitive", encoding="utf-8")
+    omni_target = tmp_path / "omnivoice-target"
+    omni_target.mkdir()
+    (omni_target / "bad").write_text("candidate", encoding="utf-8")
+    stt_target = tmp_path / "stt-target"
+    omni_stage = tmp_path / "omnivoice-stage"
+    stt_stage = tmp_path / "stt-stage"
+    omni_stage.mkdir()
+    stt_stage.mkdir()
+
+    harness = (
+        "set -uo pipefail\n"
+        "transaction_active=1\n"
+        'backup=$1; omni_target=$2; stt_target=$3; omni_stage=$4; stt_stage=$5\n'
+        'omni_unit=$6; stt_unit=$7\n'
+        "omni_had_target=1; stt_had_target=0; omni_had_unit=0; stt_had_unit=0\n"
+        "omni_was_active=0; stt_was_active=0; omni_was_enabled=0; stt_was_enabled=0\n"
+        'omni_service=omni.service; stt_service=stt.service\n'
+        "systemctl() { return 0; }\n"
+        + rollback
+        + "\nrollback\n"
+    )
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            harness,
+            "rollback-test",
+            str(backup),
+            str(omni_target),
+            str(stt_target),
+            str(omni_stage),
+            str(stt_stage),
+            str(tmp_path / "omni.service"),
+            str(tmp_path / "stt.service"),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert backup.is_dir()
+    assert not (backup / "omnivoice.curl.conf").exists()
+    assert not (backup / "stt.curl.conf").exists()
+    assert not omni_stage.exists()
+    assert not stt_stage.exists()
+
+
+def test_release_version_is_consistent() -> None:
+    assert 'version = "1.0.4"' in (ROOT / "backend" / "pyproject.toml").read_text()
+    assert 'version="1.0.4"' in (ROOT / "backend" / "src" / "talktohermes" / "app.py").read_text()
+    assert "version: 1.0.4" in (ROOT / "api" / "openapi.yaml").read_text()
+    lock = (ROOT / "backend" / "uv.lock").read_text()
+    assert 'name = "talktohermes"\nversion = "1.0.4"' in lock
 
 
 def test_deployment_runbook_documents_container_and_service_validation() -> None:
@@ -271,7 +586,7 @@ def test_deployment_runbook_documents_container_and_service_validation() -> None
         "Minimal privileged commands",
         "Port collision",
         "Cross-token isolation",
-        "Telegram",
+        "other Hermes clients",
     ):
         assert topic in runbook
 
@@ -280,8 +595,8 @@ def test_runbook_auth_configs_use_the_entered_token() -> None:
     bridge = read("README.md")
     stt = (ROOT / "services" / "stt" / "README.md").read_text(encoding="utf-8")
     for runbook in (bridge, stt):
-        assert 'Authorization: Bearer %s' in runbook
-        assert 'Authorization: Bearer ***' not in runbook
+        assert "%s" in runbook
+        assert "***" not in runbook
 
 
 def test_user_deploy_builds_venv_only_at_final_release_path() -> None:
@@ -363,8 +678,8 @@ def test_product_identity_is_preserved_and_signing_is_portable() -> None:
     assert project.count("PRODUCT_BUNDLE_IDENTIFIER = net.acelab.TalkToHermes;") == 2
     assert project.count("PRODUCT_BUNDLE_IDENTIFIER = net.acelab.TalkToHermesTests;") == 2
     assert project.count("PRODUCT_BUNDLE_IDENTIFIER = net.acelab.TalkToHermesUITests;") == 2
-    assert project.count("MARKETING_VERSION = 1.0.3;") == 6
-    assert project.count("CURRENT_PROJECT_VERSION = 3;") == 6
+    assert project.count("MARKETING_VERSION = 1.0.4;") == 6
+    assert project.count("CURRENT_PROJECT_VERSION = 4;") == 6
 
     keychain = (ROOT / "ios/TalkToHermes/TalkToHermes/KeychainStore.swift").read_text()
     content = (ROOT / "ios/TalkToHermes/TalkToHermes/ContentView.swift").read_text()

@@ -2,7 +2,7 @@
 
 This directory is an operator-reviewed example, not an installer. It makes no production changes. Each instance is one existing Unix account, one loopback bridge port, two bridge credentials plus any tokens required by configured remote providers, and one SQLite state directory. Never run two bridge processes against the same state directory.
 
-The bridge remains a systemd service. Caddy remains the existing Docker deployment. The Caddy example deliberately does **not** install a systemd Caddy, replace a complete Caddyfile, or add a cloud tunnel/public proxy.
+The examples run the bridge as a systemd service and integrate it with an operator-managed Caddy deployment. They deliberately do **not** install Caddy, replace a complete Caddyfile, or add a cloud tunnel/public proxy.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ This repository is not a host bootstrapper. Provision and verify the required op
 
 - Debian with systemd user services, one dedicated Unix account per bridge instance, and `systemctl --user` plus `systemd-analyze`. Enable user lingering separately if an instance must start without an interactive login.
 - Operator tools used by the scripts and gates: `git`, `curl`, `ca-certificates`, `coreutils`, `iproute2`, and an administrator-reviewed [`uv`](https://docs.astral.sh/uv/getting-started/installation/) installation. Install bridge dependencies from `backend/uv.lock` with `uv sync --frozen`.
-- An installed [Hermes Agent](https://hermes-agent.nousresearch.com/docs/getting-started/installation/) for each instance account. Its API must already be healthy on loopback and the configured `voice_worker` paths must point to that account's Hermes interpreter and root. TalkToHermes does not install or replace Hermes or its Telegram gateway.
+- An installed [Hermes Agent](https://hermes-agent.nousresearch.com/docs/getting-started/installation/) for each instance account. Its API must already be healthy on loopback and the configured `voice_worker` paths must point to that account's Hermes interpreter and root. TalkToHermes does not install or replace Hermes or other configured gateways.
 - A reviewed TalkToHermes checkout, private per-instance configuration and secrets, a mode-`0700` state directory, and the Caddy/private-PKI setup documented below.
 
 ### Voice-provider prerequisites
@@ -56,11 +56,11 @@ Three transactional scripts cover the three runtime subsystems. They validate pr
 - `deployment/scripts/deploy-primary-voice-server-user-services.sh [REPOSITORY_ROOT] [VOICE_HOST_IP] [REVISION]` — run on the GPU voice host as its unprivileged service user. It deploys both service packages and units from one resolved Git commit, restarts them sequentially, and verifies both health endpoints. Existing model caches, tokens, venvs, and configuration remain outside the replaced package directories. The documented example address defaults to `192.168.100.20`; private deployments pass their own LAN address explicitly.
 - `deployment/scripts/deploy-fallback-piper-user.sh INSTANCE VOICE PORT BIND_IP [SERVER_ROOT]` — run in the target macOS GUI session as the voice-service user. It installs a launchd agent and the warm-Piper supervisor, validates the selected local model, rejects occupied ports, performs an automatic synthesis warm-up, and rolls back if readiness fails.
 
-The scripts intentionally do not disable unrelated legacy root daemons. Retiring one requires a separately reviewed privileged `launchctl bootout system/LABEL` and preserving its plist for rollback.
+The primary voice-server script expects the OmniVoice environment at `~/.local/opt/talktohermes-omnivoice/venv`, its config and token under `~/.config/talktohermes-omnivoice/`, the STT token under `~/.config/talktohermes-stt/`, and the reviewed STT runtime at `/opt/stt/.venv`. It deploys package sources below the corresponding `~/.local/opt/.../current` trees. Both authenticated `/ready` gates and unauthenticated `401` checks must pass before the transaction commits.
 
 ## Preferred bridge user-service installation
 
-The current deployment runs the bridge in the instance user's systemd manager. It needs no root-owned release, configuration, or state directory. Prepare it as the instance user from a repository checkout:
+The preferred deployment runs the bridge in the instance user's systemd manager. It needs no root-owned release, configuration, or state directory. Prepare it as the instance user from a repository checkout:
 
 ```sh
 INSTANCE=instance-a
@@ -83,9 +83,9 @@ systemctl --user is-active "talktohermes@$INSTANCE.service"
 
 Omit the candidate path when configuration is unchanged. When it is supplied, the script requires a current-user-owned absolute regular file, validates it with the candidate release before switching code, installs it as mode `0600`, and restores the complete previous YAML before restarting the previous release if any later gate fails.
 
-For startup without an interactive login, an administrator performs the one-time host operation `loginctl enable-linger INSTANCE`. The user unit deliberately omits mount-namespace and cgroup-IP-firewall directives: an unprivileged user manager maps reviewed root-owned adapter paths to `nobody` when creating that namespace, causing the bridge's root-ownership gate to reject them. The process still runs as the dedicated unprivileged account with the remaining compatible restrictions.
+For startup without an interactive login, an administrator performs the one-time host operation `loginctl enable-linger INSTANCE`. The user unit omits mount-namespace and cgroup-IP-firewall directives that are unavailable or unreliable in an unprivileged user manager. Keep the bridge and Hermes listeners on loopback and enforce remote-provider access at the proxy and host firewall.
 
-The root-owned `/opt`, `/etc`, `/var/lib`, and system-manager procedure below is retained as a separately scoped legacy alternative. Do not mix its paths or unit with the preferred user-service layout.
+An alternative root-owned `/opt`, `/etc`, `/var/lib`, and system-manager procedure is documented below. Choose one deployment layout and do not mix their paths or units.
 
 ## Invariants and assumptions
 
@@ -93,15 +93,15 @@ The root-owned `/opt`, `/etc`, `/var/lib`, and system-manager procedure below is
 - Root owns releases below `/opt/talktohermes/releases`; `/opt/talktohermes/current` is a root-owned symlink. Runtime users cannot change bridge code.
 - `/etc/talktohermes/INSTANCE.yaml` is root-owned mode `0644` and contains no credentials. `/etc/talktohermes/INSTANCE.secrets` is owned by that instance and mode `0600`, because the unprivileged process must read it. The enclosing directory is root-owned mode `0755`.
 - `/var/lib/talktohermes/INSTANCE` is owned by the instance and mode `0700`. It must never be shared across instances.
-- The Hermes gateway/API stays at `http://127.0.0.1:8642`. Preserve the existing Hermes/Telegram gateway; do not rebind, replace, disable, or expose it. The TalkToHermes bridge also stays on `127.0.0.1`.
+- The Hermes gateway/API stays at `http://127.0.0.1:8642`. Preserve other Hermes clients and surfaces; do not rebind, replace, disable, or expose the API. The TalkToHermes bridge also stays on `127.0.0.1`.
 - `hermes.voice_instructions` is a non-secret, bounded instance setting appended by Hermes to its normal system prompt for each TalkToHermes run. Keep it voice-oriented and free of credentials. Clients may choose only `short`, `normal`, or `detailed`; they cannot submit arbitrary instructions.
 - The worker paths are `/home/INSTANCE/.hermes/hermes-agent/venv/bin/talktohermes-python`, root-owned `/opt/talktohermes/current/backend/worker/hermes_voice_worker.py`, and `/home/INSTANCE/.hermes/hermes-agent`. The Hermes root/venv/interpreter remain instance-owned and read-only to the service mount namespace; the immutable release script may be root-owned. `ProtectHome=tmpfs` exposes only the explicitly read-only `.hermes` tree and the uv-managed Python base tree referenced by that venv; no home writes are permitted. The worker's `/proc/self/fd` launch is an activation test gate under `ProtectProc=invisible`/`ProcSubset=pid`.
 - Provider order comes directly from each instance's `stt` and `tts` lists. HTTPS and `tcp://` targets, remote voices, the local STT model, and the local Piper voice are instance settings. Omitting an optional middle provider makes failure fall directly to the local last resort.
 - Remote HTTPS entries independently configure `connect_timeout_seconds` (default `0.5`, range `0.1`–`5`), `response_timeout_seconds` (default `120`, range `0.1`–`300`), and `circuit_cooldown_seconds` (default `45`, range `5`–`300`). Keep the connect bound short on the private LAN without reducing the bounded inference deadline. The bridge uses real TCP/TLS requests, never ICMP ping, and skips an unavailable endpoint during its process-local cooldown before allowing one half-open recovery request. Duplicate remote endpoints in one STT or TTS list are rejected so a cooldown cannot be bypassed by a second list entry.
 - `text_retention_hours` defaults to and cannot exceed `24`. It applies to locally cached voice input transcripts, answer text, and text-bearing SSE deltas after a turn becomes terminal; content-free metrics and provider events remain. `cleanup_interval_seconds` is a discovery heartbeat from `1` through `900` seconds. Once a pending text expiry is known, the process schedules cleanup for that deadline rather than waiting for the next full heartbeat. A transient cleanup failure is retried without terminating the retention task.
 - The public example LAN uses `192.168.100.10` (`hermes-agent.home.arpa`), `.20` (`primary-voice-server.home.arpa`), and optional `.30` (`fallback-voice-server.home.arpa`). These are documentation examples only. The main systemd unit permits only loopback; site-local resolver and provider `/32` addresses belong in the operator drop-in described below.
-- For conversational latency, run one warm Wyoming-Piper process per voice on a dedicated port (for example `:10201` and `:10202`) and point each bridge at its process. This deployment on the fallback voice server is intentionally deferred; the configuration work does not start or modify those services.
-- One public **HTTPS** custom port maps to one unique loopback bridge port. No HTTP listener is defined.
+- For conversational latency, run one warm Wyoming-Piper process per voice on a dedicated configurable port and point each bridge at its process.
+- One LAN-facing private **HTTPS** custom port maps to one unique loopback bridge port. No HTTP listener is defined.
 
 ## Minimal privileged commands
 
@@ -116,11 +116,11 @@ docker inspect|build|compose|exec                 # existing Docker Caddy operat
 firewall change for the selected HTTPS port       # only if policy requires it
 ```
 
-The normal operator here has neither passwordless sudo nor Docker-group access. Do not work around that; hand the reviewed commands/artifacts to the privileged operator.
+The application operator should not require passwordless sudo or Docker-group access. Hand reviewed commands and artifacts to the privileged host operator instead of broadening permissions.
 
 ## Port collision preflight
 
-Choose unique values, for example bridge `18081` and public HTTPS `8443`, then check **before any write**:
+Choose unique values, for example bridge `18081` and LAN-facing HTTPS `8443`, then check **before any write**:
 
 ```sh
 ss -ltnp 'sport = :18081'
@@ -129,7 +129,7 @@ ss -ltnp 'sport = :8443'
 
 An empty result is required for a new instance. For an upgrade, the known `talktohermes@INSTANCE.service` may own the bridge port. Any other owner is a blocker. Also confirm the chosen ports differ from Hermes `8642`, Caddy `80/443`, and Caddy admin `2019`.
 
-## Legacy root/system-service install
+## Alternative root-owned system-service install
 
 1. As an unprivileged release builder, test and build from the reviewed revision:
 
@@ -183,7 +183,7 @@ An empty result is required for a new instance. For an upgrade, the known `talkt
 
 ### Optional Wyoming STT adapter
 
-Only instances whose `stt` list contains `type: wyoming` need this adapter. Stage the reviewed wrapper at the exact path used by the bridge; this is a future operator step, not something performed by the configuration refactor:
+Only instances whose `stt` list contains `type: wyoming` need this adapter. Stage the reviewed wrapper at the exact path used by the bridge:
 
 ```sh
 install -d -o root -g root -m 0755 /opt/hermes-stt-wyoming/app
@@ -216,41 +216,21 @@ Review and lock the `uv` provenance before running these commands. The adapter r
 
    Compare the effective `systemctl show` allowlist with the separately recorded resolver/provider resolutions, then verify DNS resolution and each configured provider through the running service. Any placeholder, missing resolver/provider `/32`, extra address, failed resolution, or failed reachability is an activation blocker: keep or return the service to stopped state, correct the drop-in, and repeat all checks. This fail-closed drop-in verification is mandatory. If `systemd-analyze` is unavailable in a packaging/test environment, the unit tests remain mandatory and the real target must perform verification before activation.
 
-## Existing Docker Caddy integration
+## Docker Caddy integration
 
-The production root is `/opt/caddy`; host networking and persistent `/data` and `/config` volumes are in use. The legacy OpenClaw container and floating image were retired. Preserve the established container name `caddy-hermesagent` and image identifier `local/caddy-hermesagent:2.11.4-cloudflare-a8737d095ad5`; renaming either is a separate migration. The container serves the authenticated Hermes dashboard from `127.0.0.2:9119` on standard HTTPS, while the Hermes gateway API remains private on `127.0.0.1:8642`. TalkToHermes has a separate `8443 → 127.0.0.1:18081` route.
+Treat `caddy/compose.example.yaml` and `caddy/Caddyfile.merged.example` as fragments for an operator-managed deployment, not complete replacement files. Replace documentation placeholders, preserve unrelated routes and persistent Caddy data, and keep the Hermes API on loopback. The example maps private HTTPS `8443` to the TalkToHermes bridge at `127.0.0.1:18081` and uses `tls internal`; adapt the ports and hostname to the deployment.
 
-```sh
-docker inspect --format '{{.Config.Image}}' caddy-hermesagent
-docker exec caddy-hermesagent caddy version
-docker exec caddy-hermesagent caddy list-modules
-```
-
-The established reviewed image includes Caddy 2.11.4 with pinned builder/runtime indexes and the historically bundled DNS module. The `home.arpa` routes do not invoke a public DNS provider and require no DNS API token; they use Caddy's private PKI with `tls internal`. Do not change the image identity in this repository scrub. Build from `/opt/caddy` after copying in the reviewed Dockerfile and merging—not replacing—the Compose service:
-
-```sh
-docker compose -f docker-compose.yaml build --pull=false caddy
-docker compose -f docker-compose.yaml run --rm caddy caddy version
-docker compose -f docker-compose.yaml run --rm caddy caddy list-modules
-```
-
-Merge, do not blindly apply, `caddy/compose.example.yaml` into `/opt/caddy/docker-compose.yaml`. Preserve the existing Hermes Agent route and `/data`/`/config` storage. Keep host networking. No DNS-provider secret mount or environment variable is needed for these `home.arpa` routes.
-
-Merge the reviewed `caddy/Caddyfile.merged.example` with `/opt/caddy/Caddyfile` by diff. Both `home.arpa` sites explicitly use `tls internal`. Standard HTTPS proxies only to the authenticated dashboard on `127.0.0.2:9119`; never proxy the private Hermes API on `127.0.0.1:8642`. TalkToHermes uses the same hostname on port `8443` and upstream `127.0.0.1:18081`.
-
-Before restart, validate the complete merged Caddyfile and prove both port-specific routes are still present in adapted JSON. After restart, verify valid TLS and upstream behavior for both `https://hermes-agent.home.arpa/` and `https://hermes-agent.home.arpa:8443/health`; never use `curl -k`.
-
-Validate the merged configuration and image before restart:
+Validate the complete merged configuration before restart and verify the TalkToHermes health route afterwards without bypassing TLS verification:
 
 ```sh
 docker compose config
-docker compose run --rm caddy caddy list-modules
-docker compose -f docker-compose.yaml run --rm caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose run --rm caddy caddy version
+docker compose run --rm caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 docker compose up -d --no-deps caddy
-docker exec caddy-hermesagent caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+curl --fail --silent --show-error https://hermes-agent.home.arpa:8443/health
 ```
 
-Container validation may be skipped on a developer host without Docker access, but it is a production activation gate. This design uses direct private-PKI HTTPS only—no cloud tunnel, public cloud proxy, or plaintext public route.
+Use the actual Compose service and container names from the target deployment; this repository assumes none. Container validation is a production activation gate even when it is unavailable on a developer host. This design uses direct private-PKI HTTPS only—no cloud tunnel, public cloud proxy, or plaintext public route.
 
 ### Trust the primary voice server's internal CA on the bridge host
 
@@ -268,7 +248,7 @@ The bridge's HTTPX clients use the system trust store. Verify both `https://prim
 
 ### Install and trust the internal Root CA on iOS
 
-Caddy stores its local authority under the persistent data volume. After the validated container has created the authority, an administrator exports **only** `/data/caddy/pki/authorities/local/root.crt` from `caddy-hermesagent`. Never copy, publish, or transfer the adjacent private key. Record the certificate SHA-256 fingerprint on the Caddy host and compare it over a separate trusted channel before installation on the device.
+Caddy stores its local authority under the persistent data volume. After the validated Caddy service has created the authority, an administrator exports **only** `/data/caddy/pki/authorities/local/root.crt` from the active deployment. Never copy, publish, or transfer the adjacent private key. Record the certificate SHA-256 fingerprint on the Caddy host and compare it over a separate trusted channel before installation on the device.
 
 Transfer the root certificate directly to the managed iPhone/iPad (for example with an authenticated MDM configuration profile or local AirDrop), not through a public URL, chat, or email. On iOS, install the downloaded profile in **Settings → General → VPN & Device Management**, then explicitly enable the installed root under **Settings → General → About → Certificate Trust Settings**. Verify the displayed subject and fingerprint first. A certificate appearing as installed is not sufficient until full trust is enabled. Finally, open both `https://hermes-agent.home.arpa/` and the configured custom port without a TLS warning and run the authenticated application gate. Never use `curl -k`, disable URLSession trust evaluation, or install the Caddy private key on a client.
 
@@ -287,7 +267,7 @@ Auth gates are mandatory: no token and a known-wrong token must return `401`; th
 
 ```sh
 curl --output /dev/null --write-out '%{http_code}\n' http://127.0.0.1:18081/v1/status
-curl --header 'Authorization: Bearer deliberately-wrong' --output /dev/null --write-out '%{http_code}\n' http://127.0.0.1:18081/v1/status
+curl --header 'Authorization: Bearer KNOWN_WRONG_TOKEN_AT_LEAST_32_CHARS' --output /dev/null --write-out '%{http_code}\n' http://127.0.0.1:18081/v1/status
 umask 077; AUTH_FILE=$(mktemp)
 read -r -s -p 'APP_TOKEN: ' TOKEN; printf '\n'
 printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" > "$AUTH_FILE"; unset TOKEN
@@ -299,16 +279,16 @@ Repeat the authenticated request through `https://hermes-agent.home.arpa:CUSTOM_
 
 ### Cross-token isolation
 
-For two instances A and B, verify A's protected curl config gets `200` only on A and `401` on B; repeat in reverse. Also confirm distinct YAML ports, secret files, state directories, SQLite files, Hermes roots/profiles, and public HTTPS ports. Never copy a token between instances merely to make this test pass.
+For two instances A and B, verify A's protected curl config gets `200` only on A and `401` on B; repeat in reverse. Also confirm distinct YAML ports, secret files, state directories, SQLite files, Hermes roots/profiles, and LAN-facing HTTPS ports. Never copy a token between instances merely to make this test pass.
 
-Finally run one representative create/voice/status/audio flow through HTTPS. Confirm it creates a session in only that instance's Hermes profile and that the existing Telegram/Hermes gateway still functions unchanged.
+Finally run one representative create/voice/status/audio flow through HTTPS. Confirm it creates a session in only that instance's Hermes profile and that other Hermes clients still function unchanged.
 
 ## Upgrade
 
 1. Build and fully test a new immutable `REVISION`; retain the previous release.
 2. Repeat port ownership checks; the current instance service is the only acceptable bridge owner.
-3. Before upgrading to the `assistant_name` status contract, back up each private instance YAML and add the bridge's explicit printable, unpadded 1–64-character `assistant_name`. Tool visibility and identity are derived from actual Hermes `tool.started` events; do not maintain a second capability allowlist or alias map in the bridge. Optional `tool_summaries` are keyed by unchanged raw tool IDs. The obsolete `exposed_tools` key is ignored only for migration compatibility. The bridge contains a transition fallback only for legacy instances whose exact `instance_id` is `klaus` or `johanna`; every other instance must set the name explicitly. Keep the complete prior YAML with the prior release for rollback.
-4. Deploy and verify the backend before distributing the matching iOS app. The new app can read the two known legacy IDs during transition, while the upgraded backend always returns the explicit validated name. Verify `/v1/status` for each instance before app rollout.
+3. Back up each private instance YAML and ensure it contains an explicit printable, unpadded 1–64-character `assistant_name`. Tool visibility and identity come from actual Hermes `tool.started` events; do not maintain a second capability allowlist or alias map in the bridge. Optional `tool_summaries` are keyed by unchanged raw tool IDs. Keep the complete prior YAML with the prior release for rollback.
+4. Deploy and verify the backend before distributing the matching iOS app. Verify that `/v1/status` returns the configured instance ID and assistant name for each bridge before app rollout.
 5. Stage `/opt/talktohermes/releases/NEW_REVISION`, install its pinned dependencies, and validate the CLI with a non-listening unit test—do not manually launch a second server.
 6. Atomically repoint `current`, then explicitly restart (an already active unit will not pick up a new symlink otherwise):
 
@@ -319,7 +299,7 @@ Finally run one representative create/voice/status/audio flow through HTTPS. Con
    systemctl is-active talktohermes@INSTANCE.service
    ```
 
-7. Repeat health, auth, HTTPS, representative voice flow, Telegram preservation, and cross-token checks. Upgrade the custom Caddy image only when required, with separately reviewed pins and container validation.
+7. Repeat health, auth, HTTPS, representative voice flow, other-client preservation, and cross-token checks. Upgrade the Caddy image only when required, with separately reviewed pins and container validation.
 
 ## Rollback
 

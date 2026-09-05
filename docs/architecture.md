@@ -1,6 +1,6 @@
 # TalkToHermes Architecture
 
-![TalkToHermes architecture](/images/TalkToHermes-architecture.png)
+![TalkToHermes architecture](../images/TalkToHermes-architecture.png)
 
 ## Goal
 
@@ -13,6 +13,8 @@ Hermes already provides voice recording behavior, VAD, sentence-aware TTS, local
 The broad Hermes Desktop/dashboard API is not exposed to iOS. In particular, the app receives no dashboard token and cannot call `/api/ws` or `/api/audio/*` directly.
 
 ## Component topology
+
+The diagram uses reserved `home.arpa` names and RFC 1918 addresses as replaceable documentation examples; they are not installation endpoints compiled into TalkToHermes.
 
 ```text
 iPhone/iPad
@@ -58,23 +60,23 @@ Both use `hermes-agent.home.arpa`; host plus port identifies the instance. Caddy
 1. iOS reaches only its narrow Voice Bridge instance.
 2. Every Hermes API Server remains loopback-only and has a separate key.
 3. App token and Hermes key are different credentials per instance.
-4. Wyoming, Coglet, OmniVoice, Piper, Hermes API, and `hermes serve` are never directly exposed to iOS.
+4. Configured STT/TTS backends, Hermes API, and `hermes serve` are never directly exposed to iOS.
 5. No router forwarding, public tunnel, or cloud proxy.
 6. Caddy issues `home.arpa` certificates through its private PKI (`tls internal`); managed iOS clients explicitly trust the fingerprint-verified internal Root CA.
 
 ## Session model
 
-One TalkToHermes conversation maps to one dedicated Hermes session in the configured user's profile. The mapping is server-side; Hermes session IDs are not exposed. TalkToHermes conversations do not merge with Telegram transcripts.
+One TalkToHermes conversation maps to one dedicated Hermes session in the configured user's profile. The mapping is server-side; Hermes session IDs are not exposed. TalkToHermes conversations do not merge with conversations from other Hermes clients.
 
 The Hermes session is the longer-lived canonical conversation context. Deleting a TalkToHermes conversation removes its local mapping and artifacts but intentionally does not yet delete the mapped Hermes session.
 
-The verified approval-capable turn path composes two official APIs. Before each run the bridge reads `/api/sessions/{id}/messages` and passes that canonical history as `conversation_history` to `/v1/runs` together with the same `session_id`. This is necessary because current Runs persist but do not automatically resume prior session context, while session-chat streaming currently lacks a run approval session. The bridge never owns a second conversation-history store.
+The approval-capable turn path composes two official APIs. Before each run the bridge reads `/api/sessions/{id}/messages` and passes that canonical history as `conversation_history` to `/v1/runs` together with the same `session_id`. This is necessary because Runs persist messages but do not automatically resume prior session context, while session-chat streaming does not provide the approval lifecycle required by the bridge. The bridge never owns a second conversation-history store.
 
 Each run also receives a bounded, operator-configurable `hermes.voice_instructions` overlay. It preserves the configured Hermes profile, identity, memory, tools and safety prompt while shaping output for spoken delivery. The authenticated client selects only the allowlisted per-turn response style `short`, `normal` or `detailed`; the bridge maps that enum to fixed instructions and fingerprints it as part of idempotency. No request can supply arbitrary system-prompt text.
 
 The authenticated status response exposes the configured bridge `instance_id` and the explicit server-controlled `assistant_name` (a printable, unpadded display name of 1–64 Unicode characters). The native client treats endpoint plus `instance_id` plus `assistant_name` as the bridge identity and resets local conversation state when any of them changes. It displays the supplied assistant name instead of deriving a persona from an identifier. Spoken-conversation instructions remain operator-configurable per bridge and are never supplied by the client.
 
-Tool activity is fail-closed per-call metadata. Every valid `tool.started` event from the trusted loopback Hermes Runs API creates a distinct stable marker; the event itself is the source of truth that the configured Hermes instance actually invoked that tool. Identifiers accept Hermes' real built-in, plugin, deferred, and MCP naming form and remain unchanged end to end so identity and approval correlation cannot collide. The iOS client formats the raw identifier only for visual readability. The bridge records only the fixed `invoked` status, start time, and conservatively correlated approval/risk metadata. Runtime previews are always discarded and never persisted. An optional `tool_summaries` mapping supplies bounded, static, administrator-reviewed public descriptions keyed by the raw Hermes tool identifier; REST and SSE add these labels only at egress, so historical event payloads cannot override them. Repeated calls are not deduplicated. Raw previews, arguments, results, paths, prompts, and malformed tool IDs never cross the bridge boundary. Completion status and duration are deliberately absent because the current Hermes Runs stream provides no call ID with which to correlate parallel same-tool completions safely. The obsolete `exposed_tools` configuration key is accepted only for one-way migration and discarded before runtime validation; it cannot filter or rename tools. The legacy unique `tools` response field remains additive compatibility metadata for older apps.
+Tool activity is fail-closed per-call metadata. Every valid `tool.started` event from the trusted loopback Hermes Runs API creates a distinct stable marker; the event itself is the source of truth that the configured Hermes instance actually invoked that tool. Identifiers accept Hermes' real built-in, plugin, deferred, and MCP naming form and remain unchanged end to end so identity and approval correlation cannot collide. The iOS client formats the raw identifier only for visual readability. The bridge records only the fixed `invoked` status, start time, and conservatively correlated approval/risk metadata. Runtime previews are always discarded and never persisted. An optional `tool_summaries` mapping supplies bounded, static, administrator-reviewed public descriptions keyed by the raw Hermes tool identifier; REST and SSE add these labels only at egress, so stored event payloads cannot override them. Repeated calls are not deduplicated. Raw previews, arguments, results, paths, prompts, and malformed tool IDs never cross the bridge boundary. Completion status and duration are deliberately absent because the current Hermes Runs stream provides no call ID with which to correlate parallel same-tool completions safely.
 
 ## Hermes Voice Worker
 
@@ -88,7 +90,7 @@ omnivoice   -> text_to_speech_tool(provider="openai")
                -> separate primary voice server wrapper /v1/audio/speech
 ```
 
-This isolates Python dependencies and lets contract tests detect upstream changes. The existing fallback voice server adapter and primary voice server's OpenAI-compatible STT endpoint remain explicit bridge adapters. OmniVoice uses a separate TalkToHermes-specific service and port on primary voice server; TalkWithMe's service on port 8181 remains untouched. No global Hermes voice configuration is changed.
+This isolates Python dependencies and lets contract tests detect upstream changes. Configured fallback adapters and the primary voice server's OpenAI-compatible STT endpoint remain explicit bridge adapters. OmniVoice uses a separate TalkToHermes-specific service and endpoint. No global Hermes voice configuration is changed.
 
 ## Availability modes
 
@@ -150,4 +152,4 @@ The iOS 17+ SwiftUI client accepts a bridge hostname, HTTPS port, and bearer tok
 
 The bearer token is stored with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`. An empty token field may reuse the Keychain token only when the normalized host and port are unchanged. Changing either value requires an explicitly entered token, and failed validation leaves the previous endpoint and token intact. Authenticated redirects are accepted only within the same HTTPS scheme, host, and port. A saved endpoint change rebuilds the API client and clears the current conversation binding so a conversation is not silently reused against another bridge. Normal URLSession certificate validation remains mandatory; no TLS bypass exists.
 
-Voice uploads carry an explicit language tag. The native client stores an independent spoken-language choice (`de` or `en`), defaults missing or invalid legacy settings to German, and sends the selected value explicitly on every turn; it does not infer speech language from app localization, device language, or region. Recording is tap-to-start/tap-to-send, playback can be stopped and replayed, and tapping the microphone during playback stops audio and starts a new recording without deleting conversation context. If recording startup fails, the previous answer remains replayable. Build and endpoint setup are documented in [`ios/README.md`](../ios/README.md).
+Voice uploads carry an explicit language tag. The native client stores an independent spoken-language choice (`de` or `en`), defaults missing or invalid stored values to German, and sends the selected value explicitly on every turn; it does not infer speech language from app localization, device language, or region. Recording is tap-to-start/tap-to-send, playback can be stopped and replayed, and tapping the microphone during playback stops audio and starts a new recording without deleting conversation context. If recording startup fails, the previous answer remains replayable. Build and endpoint setup are documented in [`ios/README.md`](../ios/README.md).

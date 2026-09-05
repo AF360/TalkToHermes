@@ -22,7 +22,7 @@ Open **Settings** in the app and enter values supplied by the bridge administrat
 
 Enter only the hostname in **Server**. Do not enter `https://`, a port, URL credentials, a path, a query string, or a fragment. The app trims whitespace, lowercases the hostname, removes a trailing dot, and validates every DNS label. HTTPS is fixed and cannot be disabled.
 
-When **Save** is tapped, the app first calls the authenticated `GET /v1/status` endpoint. It commits the normalized server, port, response style, spoken language, and Keychain token only after the bridge returns a ready status. The authenticated response also supplies the instance identity displayed by the app.
+When **Save** is tapped, the app first calls the authenticated `GET /v1/status` endpoint. It commits the normalized server, port, response style, spoken language, and Keychain token only after the bridge returns a ready status. The authenticated response also supplies the instance ID and assistant display name used by the app.
 
 Host and port are persisted in app preferences. The bearer token is stored separately in the Keychain with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`; it is never stored in preferences or source code.
 

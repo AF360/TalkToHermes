@@ -1,6 +1,6 @@
 # Dedicated primary voice server TalkToHermes STT
 
-This is a repository-only deployment artifact. It does not replace or modify a legacy STT listener on port `5005`, another voice application, or any existing global Hermes voice setting. The dedicated service runs as a dedicated unprivileged service user, listens only on `127.0.0.1:5050`, and is exposed solely by Caddy as `https://primary-voice-server.home.arpa:9444`.
+This repository component provides the dedicated TalkToHermes STT endpoint. It runs as a dedicated unprivileged service user, listens only on `127.0.0.1:5050`, and is exposed solely by Caddy as `https://primary-voice-server.home.arpa:9444`. It does not change global Hermes voice settings.
 
 ## Prerequisites
 
@@ -28,11 +28,11 @@ systemctl --user is-system-running
 loginctl show-user VOICE_SERVICE_USER -p Linger
 ```
 
-Port 5050 must be unused for a new installation. Port 9444 must be unused or owned by the reviewed local Caddy configuration. Do not stop or edit port 5005. Confirm Caddy's existing routes and TalkWithMe before proceeding.
+Port 5050 must be unused for a new installation. Port 9444 must be unused or owned by the reviewed local Caddy configuration. Confirm that the Caddy fragment can be merged without changing unrelated routes before proceeding.
 
 ## Build the reviewed offline Gunicorn vendor target
 
-`gunicorn.requirements.lock` pins Gunicorn 23.0.0's universal wheel to the SHA-256 published by PyPI. PyPI identifies the project as MIT-licensed and the wheel is 85,029 bytes. Gunicorn's only runtime dependency, `packaging`, is already present as version 25.0 in the exact Coglet virtualenv and is deliberately not overlaid. Download the one reviewed wheel on a networked review/build host:
+`gunicorn.requirements.lock` pins Gunicorn 23.0.0's universal wheel to the SHA-256 published by PyPI. PyPI identifies the project as MIT-licensed and the wheel is 85,029 bytes. Gunicorn's only runtime dependency, `packaging`, must already be present as version 25.0 in the configured STT virtual environment and is deliberately not overlaid. Download the one reviewed wheel on a networked review/build host:
 
 ```sh
 mkdir wheelhouse
@@ -110,8 +110,8 @@ curl --config "$AUTH" --fail --silent \
 rm -f "$AUTH"; unset AUTH
 ```
 
-Require unauthenticated `401`, authenticated readiness `200`, a real representative transcription with bounded JSON text, valid certificate/hostname without `-k`, and no transcript/token/path in the journal. Re-check port 5005, TalkWithMe, and existing Hermes/Telegram operation unchanged. Close the login session and verify the TLS endpoint again; if boot persistence is required, separately verify user linger and perform a reboot acceptance test.
+Require unauthenticated `401`, authenticated readiness `200`, a real representative transcription with bounded JSON text, valid certificate/hostname without `-k`, and no transcript/token/path in the journal. Confirm that unrelated Caddy routes and other Hermes clients still operate normally. Close the login session and verify the TLS endpoint again; if boot persistence is required, separately verify user linger and perform a reboot acceptance test.
 
 ## Upgrade and rollback
 
-For upgrades, stage and test a new immutable release, re-run unit/Caddy validation, atomically repoint `current`, and explicitly `systemctl --user restart talktohermes-stt.service`. Repeat all acceptance gates. On failure, capture a bounded journal, repoint `current` to the previous reviewed release, restart, and repeat readiness plus real inference. Never redirect production TalkToHermes to plaintext 5005 as an ad-hoc rollback; 5005 remains separate fallback infrastructure unrelated to this bridge.
+For upgrades, stage and test a new immutable release, re-run unit/Caddy validation, atomically repoint `current`, and explicitly `systemctl --user restart talktohermes-stt.service`. Repeat all acceptance gates. On failure, capture a bounded journal, repoint `current` to the previous reviewed release, restart, and repeat readiness plus real inference. Never replace the authenticated TLS endpoint with an unauthenticated plaintext service as an ad-hoc rollback.

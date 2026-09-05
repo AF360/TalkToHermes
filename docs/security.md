@@ -24,14 +24,14 @@ The client cannot submit `profile` or `instance_id`. Cross-instance tokens retur
 
 ## Network
 
-- All instances use `hermes-agent.home.arpa` at `192.168.100.10` with distinct custom HTTPS ports.
+- The documented example uses `hermes-agent.home.arpa` at `192.168.100.10` with distinct custom HTTPS ports; deployments substitute their own private hostname and address.
 - The native app contains no compiled installation endpoint. It accepts a hostname and port at runtime, constructs only HTTPS URLs, and rejects schemes, credentials, embedded ports, paths, queries, fragments, and invalid DNS labels.
 - Caddy maps each external port to exactly one loopback bridge.
 - `home.arpa` TLS uses Caddy's private PKI (`tls internal`); the internal Root CA is fingerprint-verified and explicitly trusted on managed iOS devices. No public ACME DNS provider or DNS API token is used for these names.
 - Public routing, router forwarding, tunnel exposure, and public webhooks remain disabled.
 - Direct-IP TLS is allowed only with a trusted certificate containing the private IP SAN. Verification is never bypassed.
-- Hermes API, `hermes serve`, `/api/audio/*`, Wyoming, Coglet, OmniVoice, and Piper remain private backend seams.
-- The OmniVoice service accepts only a configured RFC 1918 IPv4 listener on fixed port `9090`. `0.0.0.0`, loopback, public/documentation/invalid addresses, hostnames, port `8181`, and every other port fail closed before Uvicorn starts. Listener preflight binds exactly the validated tuple before startup.
+- Hermes API, `hermes serve`, `/api/audio/*`, and all configured STT/TTS providers remain private backend seams.
+- The OmniVoice service accepts only a configured RFC 1918 IPv4 listener on fixed port `9090`. `0.0.0.0`, loopback, public/documentation/invalid addresses, hostnames, and every other port fail closed before Uvicorn starts. Listener preflight binds exactly the validated tuple before startup.
 
 ## Input controls
 
@@ -49,7 +49,7 @@ The bounded voice worker validates interpreter, virtual-environment boundary, He
 
 ## Tool approvals
 
-MVP decisions are only:
+Supported decisions are:
 
 - `once`: approve the concrete pending action once;
 - `deny`: reject it.
@@ -62,7 +62,7 @@ MVP decisions are only:
 - `retain_failed_audio=false` removes failed uploads immediately.
 - Completed and cancelled uploads are removed immediately; restart-interrupted work is never retained.
 - Undownloaded answer audio expires after 24 hours. Its first authenticated GET starts one fixed five-minute default retry/reconnect lease; retries do not extend it.
-- Voice input transcripts and answer text remain locally readable for at most 24 hours after a turn becomes terminal. Runtime tool previews are never stored. Public tool summaries are static administrator-reviewed configuration labels added only at egress. Cleanup redacts both text fields, removes text-bearing `hermes.delta` events, and removes any legacy `summary` field from retained tool lifecycle events while preserving content-free invocation markers, start time, approval/risk metadata, and provider-attempt events. Active turns are never redacted.
+- Voice input transcripts and answer text remain locally readable for at most 24 hours after a turn becomes terminal. Runtime tool previews are never stored. Public tool summaries are static administrator-reviewed configuration labels added only at egress. Cleanup redacts both text fields, removes text-bearing `hermes.delta` events, and removes any stored `summary` field from retained tool lifecycle events while preserving content-free invocation markers, start time, approval/risk metadata, and provider-attempt events. Active turns are never redacted.
 - Cleanup runs at startup and periodically, is idempotent, stays directly inside the instance audio root, and never follows symlinks or removes wrong-owner/mode entries.
 - The dedicated Hermes session remains the longer-lived canonical conversation context. Local text redaction and TalkToHermes conversation deletion do not currently delete that Hermes session.
 - Text visibility is a client presentation setting and does not alter the Hermes session or the bounded local retention rule.
@@ -82,4 +82,4 @@ Forbidden:
 
 ## Deployment permissions
 
-Each bridge and Hermes API process runs as its owning unprivileged Unix user. Shared root-owned voice adapters may be read/executable only. Deployment receives only explicitly enumerated commands. No general sudo shell, wildcard command, interpreter grant, Home Assistant write permission, or remote root key.
+Each bridge and Hermes API process runs as its owning unprivileged Unix user. Shared root-owned voice adapters may be read/executable only. Deployment receives only explicitly enumerated commands. No general sudo shell, wildcard command, interpreter grant, write access to unrelated services, or remote root key.

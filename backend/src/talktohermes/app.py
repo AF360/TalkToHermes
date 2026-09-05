@@ -103,7 +103,7 @@ def create_app(
                 raise first_close_error
 
     app = FastAPI(
-        title="TalkToHermes Voice Bridge", version="1.0.3", lifespan=lifespan
+        title="TalkToHermes Voice Bridge", version="1.0.4", lifespan=lifespan
     )
 
     class RequestBodyTooLarge(Exception):

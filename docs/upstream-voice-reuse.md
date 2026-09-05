@@ -1,6 +1,6 @@
 # Existing Hermes Voice Reuse
 
-The implementation seams below were verified against Hermes in August 2026. Re-check current upstream documentation before changing a seam.
+The implementation seams below depend on current Hermes APIs. Re-check the upstream documentation before changing a seam.
 
 ## Official documentation
 
@@ -20,7 +20,7 @@ The implementation seams below were verified against Hermes in August 2026. Re-c
 | Approvals and stop | run approval/stop endpoints | expose only once/deny |
 | Spoken-text cleanup | `tools.tts_text_normalize.prepare_spoken_text` | call through worker |
 | Long-form TTS | `tools.tts_tool.text_to_speech_tool` | call with provider override |
-| OpenAI-compatible TTS seam | `tts.openai.base_url` | reusable with the dedicated `/audio/speech` adapter; a legacy `/synthesize` wrapper is incompatible |
+| OpenAI-compatible TTS seam | `tts.openai.base_url` | reusable with the dedicated `/audio/speech` adapter |
 | Piper | built-in `piper` provider plus Wyoming protocol | configured remote voice, then configured local voice |
 | Local STT recovery | `transcribe_audio_local_fallback` | call through worker |
 | Wyoming STT | installed named command adapter | call the configured packaged adapter |
@@ -48,18 +48,18 @@ They are part of the broad `hermes serve` desktop/dashboard surface rather than 
 - mobile upload/retry/idempotency and retention;
 - native iOS recording, playback, and approval UI.
 
-## Verified API nuance
+## Hermes API behavior
 
-`/v1/runs` with a repeated `session_id` persists messages but did not automatically load the preceding turn during the 2026-08-28 target test. `/api/sessions/{id}/chat/stream` does load history, but its generated run currently has no approval session resolvable through `/v1/runs/{id}/approval`. TalkToHermes therefore reads the canonical Hermes session messages immediately before each run and supplies them as the Runs API's documented `conversation_history`. A two-turn marker test proved continuity with four persisted messages; the idempotent replay did not create another turn.
+`/v1/runs` with a repeated `session_id` persists messages but does not automatically load the preceding turn. `/api/sessions/{id}/chat/stream` loads history but does not provide the approval lifecycle required by the bridge. TalkToHermes therefore reads the canonical Hermes session messages immediately before each run and supplies them as the Runs API's documented `conversation_history`.
 
-## Provider provenance retained from implementation review
+## Provider provenance
 
-The OmniVoice service is an independent clean-room adapter to the Apache-2.0 `k2-fsa/OmniVoice` API. It neither copies nor depends on `scorbo2/ai-playground`; that reviewed wrapper and its related `TalkWithMe` client are MIT-licensed. The adapter pins `omnivoice==0.2.1` and immutable model revision `c5fdb5ccb189668d56333f77ba2629f4cd7535f4` in its deployment contract. The upstream wrapper exposes JSON/base64 `/synthesize`, not OpenAI binary `/audio/speech`, which is why direct Hermes OpenAI-TTS configuration against the legacy listener is incompatible.
+The OmniVoice service is an independent clean-room adapter to the Apache-2.0 `k2-fsa/OmniVoice` API. The adapter pins `omnivoice==0.2.1` and immutable model revision `c5fdb5ccb189668d56333f77ba2629f4cd7535f4` in its deployment contract.
 
 The local fallback review used `piper-tts==1.7.0` from Open Home Foundation (`OHF-Voice/piper1-gpl`) with official `rhasspy/piper-voices` assets. The reviewed wheel SHA-256 was `72adc623b977bdbbdf3d6f6bf88d66eda7cfe2ee8e7919a74a5952acb77a339e`; the runtime dependency `pathvalidate==3.3.1` is MIT and its reviewed wheel SHA-256 was `5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f`. Voice-specific model hashes and license notices must be reviewed with the selected deployment assets and kept with the deployment record rather than private voice configuration.
 
-The dedicated STT service pins its offline `large-v3-turbo` model snapshot and validates media with PyAV before one serialized CUDA/float16 inference. It intentionally does not reuse the unauthenticated legacy listener on port `5005`, whose `response_format=text` behavior and development-server exposure were not OpenAI-compatible or production-hardened.
+The dedicated STT service pins its offline `large-v3-turbo` model snapshot and validates media with PyAV before one serialized CUDA/float16 inference. It exposes only the authenticated OpenAI-compatible transcription contract documented by TalkToHermes.
 
 ## Upgrade rule
 
-Before implementing a new voice seam, check current official docs and upstream main. A weekly read-only review reports material changes. If the official API Server gains stable audio endpoints or Hermes ships a suitable iOS client, remove the corresponding custom component rather than maintaining a duplicate.
+Before implementing a new voice seam, check current official docs and upstream main. If the official API Server gains stable audio endpoints or Hermes ships a suitable iOS client, remove the corresponding custom component rather than maintaining a duplicate.

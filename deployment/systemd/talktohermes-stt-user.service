@@ -7,9 +7,9 @@ StartLimitBurst=3
 
 [Service]
 Type=simple
-WorkingDirectory=%h/TalkToHermes-STT-Candidate
+WorkingDirectory=%h/.local/opt/talktohermes-stt/current
 Environment=PYTHONNOUSERSITE=1
-Environment=PYTHONPATH=%h/TalkToHermes-STT-Candidate/vendor:%h/TalkToHermes-STT-Candidate/src
+Environment=PYTHONPATH=%h/.local/opt/talktohermes-stt/vendor:%h/.local/opt/talktohermes-stt/current/src
 Environment=HF_HUB_OFFLINE=1
 Environment=TRANSFORMERS_OFFLINE=1
 Environment=HF_DATASETS_OFFLINE=1
