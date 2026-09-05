@@ -6,6 +6,15 @@
 
 TalkToHermes is a private, native iPhone and iPad voice client for speaking naturally with your own Hermes Agent and following the full conversation on screen. It combines secure per-user bridge isolation with configurable speech recognition and voice synthesis fallbacks, live approval and cancellation flows, and Keychain-backed credentials. The interface is available in English and German, with the app language and spoken language selected independently.
 
+The central architectural decision is **local operation for maximum privacy**. Speech recognition, multiple speech synthesis paths, and all voice orchestration and control can run entirely on systems you operate within your private network. Voice providers can be arranged in configurable quality and fallback tiers. If a preferred service is unavailable, TalkToHermes automatically continues with the next configured provider and ultimately with local last-resort STT or TTS. Speech recordings and transcripts therefore do not need to leave your own infrastructure. For fully local end-to-end operation, Hermes must also use a locally hosted LLM provider, for example a model served through Ollama.
+
+TalkToHermes is not a standalone all-in-one package. In addition to the iOS app, it requires an installed and configured Hermes Agent, the TalkToHermes Voice Bridge, and a private HTTPS endpoint. The additional voice components depend on the selected provider chain:
+
+- **Speech recognition:** Faster-Whisper on a suitable GPU system as a high-quality primary STT tier; optionally Wyoming-Faster-Whisper as a private network service, plus MLX-Whisper on an Apple Silicon Mac or another local Hermes STT model as a fallback.
+- **Speech synthesis:** local Piper as the last-resort TTS provider; optionally a persistent Wyoming-Piper service—for example on a Mac—for lower latency and additional quality tiers.
+- **Cloned voices:** optional OmniVoice with a suitable accelerator/PyTorch environment and private reference recordings.
+- **Fully local language model:** a local Hermes model provider such as Ollama when LLM processing must also remain within your own infrastructure.
+
 ## Architecture
 
 ```text
