@@ -1,12 +1,20 @@
 # TalkToHermes
+[English](README.md) · [Deutsch](README_DE.md)
 
 ![TalkToHermes](images/TalkToHermes.png)
+
+**Native push-to-talk for your Hermes Agent on iPhone and iPad — with self-hosted STT/TTS and a privacy-first voice pipeline.**
+
+✓ **Native SwiftUI** client for iPhone & iPad  
+✓ **Push-to-talk** with full conversation history  
+✓ **Self-hosted STT/TTS** with configurable fallback chains  
+✓ **Audio stays local** — even when Hermes uses a cloud LLM
 
 ## What is TalkToHermes?
 
 TalkToHermes is a private, native iPhone and iPad voice client for speaking naturally with your own Hermes Agent and following the full conversation on screen. It combines secure per-user bridge isolation with configurable speech recognition and voice synthesis fallbacks, live approval and cancellation flows, and Keychain-backed credentials. The interface is available in English and German, with the app language and spoken language selected independently.
 
-The central architectural decision is **local operation for maximum privacy**. Speech recognition, multiple speech synthesis paths, and all voice orchestration and control can run entirely on systems you operate within your private network. Voice providers can be arranged in configurable quality and fallback tiers. If a preferred service is unavailable, TalkToHermes automatically continues with the next configured provider and ultimately with local last-resort STT or TTS. Speech recordings and transcripts therefore do not need to leave your own infrastructure. For fully local end-to-end operation, Hermes must also use a locally hosted LLM provider, for example a model served through Ollama.
+The central architectural decision is **local operation for maximum privacy**. Speech recognition, multiple speech synthesis paths, and all voice orchestration and control can run entirely on systems you operate within your private network. Voice providers can be arranged in configurable quality and fallback tiers. If a preferred service is unavailable, TalkToHermes automatically continues with the next configured provider and ultimately with local last-resort STT or TTS. The voice path remains local even when Hermes uses a cloud-hosted LLM: audio files stay on your infrastructure; only the transcribed text is sent to the model provider. With a locally hosted LLM, the complete interaction can remain local end-to-end.
 
 TalkToHermes is not a standalone all-in-one package. In addition to the iOS app, it requires an installed and configured Hermes Agent, the TalkToHermes Voice Bridge, and a private HTTPS endpoint. The additional voice components depend on the selected provider chain:
 
@@ -14,6 +22,26 @@ TalkToHermes is not a standalone all-in-one package. In addition to the iOS app,
 - **Speech synthesis:** local Piper as the last-resort TTS provider; optionally a persistent Wyoming-Piper service—for example on a Mac—for lower latency and additional quality tiers.
 - **Cloned voices:** optional OmniVoice with a suitable accelerator/PyTorch environment and private reference recordings.
 - **Fully local language model:** a local Hermes model provider such as Ollama when LLM processing must also remain within your own infrastructure.
+
+## Getting started
+
+TalkToHermes is not a standalone app. A working setup consists of the iOS client, a Hermes Agent instance, the TalkToHermes Voice Bridge, and at least one configured speech-to-text and text-to-speech path.
+
+### Requirements
+
+- **Hermes Agent** — the assistant backend TalkToHermes connects to
+- **TalkToHermes Voice Bridge** — the per-user bridge between the iOS app and Hermes
+- **Speech-to-text (STT)** — for example Faster-Whisper, Wyoming Faster-Whisper, MLX-Whisper, or the local Hermes STT fallback
+- **Text-to-speech (TTS)** — for example Piper, Wyoming-Piper, OmniVoice, or the local Hermes TTS fallback
+- **iPhone or iPad with iOS 17 or later**
+- **Xcode** — currently required to build and install the iOS client
+- **HTTPS access to the Voice Bridge** — typically provided by your own reverse proxy or internal HTTPS endpoint
+
+STT and TTS providers can be arranged in ordered fallback chains. A simple installation may use only the local fallback providers on the Hermes host, while larger setups can add dedicated GPU, Mac, Wyoming, or OmniVoice services for better quality or lower latency.
+
+→ [iOS setup](ios/README.md)  
+→ [Deployment guide](deployment/README.md)  
+→ [Architecture](docs/architecture.md)
 
 ## Architecture
 
