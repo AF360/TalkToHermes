@@ -57,3 +57,8 @@ Before distributing a build:
 3. save a valid endpoint and complete one voice turn on a real device;
 4. terminate and relaunch the app, then complete a second voice turn without re-entering unchanged settings;
 5. confirm that changing server or port requires explicit token entry.
+
+## Prebuilt iOS IPA
+
+An optional unsigned IPA for iPhone and iPad (iOS 17+) is available in the TalkToHermes v1.0.4 release assets (https://github.com/AF360/TalkToHermes/releases/tag/v1.0.4), together with its SHA-256 checksum and sideloading README. The IPA must be signed with your own Apple identity using a tool such as AltStore Classic or Sideloadly. No developer signing identity or provisioning profile is included. The device build and IPA structure are verified; sideload installation has not yet been tested.
+A separately configured TalkToHermes backend and your own connection credentials are required.
