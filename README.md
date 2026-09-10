@@ -34,7 +34,7 @@ TalkToHermes is not a standalone app. A working setup consists of the iOS client
 - **Speech-to-text (STT)** — for example Faster-Whisper, Wyoming Faster-Whisper, MLX-Whisper, or the local Hermes STT fallback
 - **Text-to-speech (TTS)** — for example Piper, Wyoming-Piper, OmniVoice, or the local Hermes TTS fallback
 - **iPhone or iPad with iOS 17 or later**
-- **Xcode** — currently required to build and install the iOS client
+- **Xcode** — required when building the iOS client from source; alternatively, an unsigned IPA for sideloading is available in the latest release
 - **HTTPS access to the Voice Bridge** — typically provided by your own reverse proxy or internal HTTPS endpoint
 
 STT and TTS providers can be arranged in ordered fallback chains. A simple installation may use only the local fallback providers on the Hermes host, while larger setups can add dedicated GPU, Mac, Wyoming, or OmniVoice services for better quality or lower latency.
